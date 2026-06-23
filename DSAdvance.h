@@ -1168,7 +1168,7 @@ inline int SonyNintendoKeyNameToJoyShockKeyCode(std::string KeyName) {
 		{"R2", JSMASK_ZR},
 		{"L4", JSMASK_FNL},
 		{"R4", JSMASK_FNR},
-		{"L", JSMASK_L},	//@110 Нет L1 R1 у joycon блять
+		{"L", JSMASK_L},	//@110 Нет L1 R1 у joycon
 		{"R", JSMASK_R},
 		{"ZL", JSMASK_ZL},
 		{"ZR", JSMASK_ZR},
