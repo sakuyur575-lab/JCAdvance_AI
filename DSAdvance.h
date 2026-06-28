@@ -181,9 +181,9 @@ inline HANDLE hSerial;
 inline std::thread *pArduinoReadThread = NULL;
 inline float PedalsValues[2];
 
-inline std::vector<std::string> KMProfiles;
-inline int KMProfileIndex = 0;
-inline int KMGameProfileIndex = 0;
+//inline std::vector<std::string> KMProfiles;
+//inline int KMProfileIndex = 0;
+//inline int KMGameProfileIndex = 0;
 inline std::vector<std::string> XboxProfiles;
 inline int XboxProfileIndex = 0;
 
@@ -313,6 +313,7 @@ struct _ButtonsState {
 	Button WheelDownRight;
 
 	Button MeleeGesture; //@119
+	Button AutoSprint;	//@126
 };
 
 struct AdvancedGamepad {
@@ -435,6 +436,10 @@ struct AdvancedGamepad {
 		float EmaGyroY = 0.0f;
 		float EmaGyroZ = 0.0f;
 		float Tightening = 2.0f; //@112 now in config.ini
+		bool WasGyroActive = false; //@128 Gyro Activation Delay for MotionAimingMode only
+		float RatchetDelayTime = 150.0f; //
+		int RatchetDelayTimer = 0;
+		int RatchetDelayMaxTimer = 0;
 
 		float MotionWheelButtonsDeadZone = 0;
 		int WheelCounter = 0;
@@ -597,6 +602,10 @@ struct _AppStatus {
 	bool IsManualCalibrating = false;
 	int ManualCalibrationTimer = 0;
 	bool StartupCalibrationFrozen = false;
+	int CalibRumbleTimer = 0;
+	int LedDebugTimer = 0;		//@127 autocalibration flash led debug
+	bool LedCalibrationDebug;
+	int SeamlessResetTimer = 0;	//@129
 
 	struct _HotKeys
 	{
@@ -654,6 +663,8 @@ struct _CurrentXboxProfile {
 	unsigned int RightStick = XINPUT_GAMEPAD_RIGHT_THUMB;
 	bool SwapSticksAxis = true;
 	bool SwapTriggers = true;
+
+	unsigned int AutoSprintButton = 0;	//@126
 
 	int RightStickMode = 0; //@123 Stick as button: 0 = Default, 1 = Triggers, 2 = Buttons
 	unsigned int RightStickUp = 0;
