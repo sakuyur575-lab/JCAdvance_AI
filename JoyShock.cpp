@@ -91,6 +91,10 @@ public:
 
 	int global_count = 0;
 
+	int test_packet_count = 0;
+	std::chrono::steady_clock::time_point test_last_time = std::chrono::steady_clock::now();
+	int current_polling_rate = 0; // Сохраняет готовую герцовку для OSD
+
 	// calibration data:
 	struct brcm_hdr {
 		uint8_t cmd;
@@ -337,6 +341,27 @@ public:
             }
 
         }
+
+		//@305 [TEST]Fine-tuning calibration settings for JOY-CON
+		/*if (this->controller_type == ControllerType::n_switch) {
+
+			// 1. Порог "Неподвижности" (Допустимая дрожь рук)
+			// Оригинал: 2.0f. Чем выше, тем легче ловит ноль в руках, но выше риск ложной калибровки при медленной проводке.
+			this->motion.Settings.MaxStillnessError = 2.0f;
+
+			// Время непрерывного покоя (в секундах), которое требуется выждать до применения новой калибровки (def. 2.0f)
+			this->motion.Settings.MinStillnessCorrectionTime = 2.0;
+
+			// 2. Скорость роста Уверенности (Confidence)
+			// Оригинал: 1.0f (нужна 1 секунда). При 2.0f нужно 0.5 секунды. При 4.0f - всего 0.25 сек.
+			this->motion.Settings.StillnessConfidenceRate = 1.0f;
+
+			// Время применения новоого нуля (Def. 3f)
+			this->motion.Settings.StillnessCalibrationEaseInTime = 3.0f;
+
+			// Скорость расширения порога шума во время движения, чтобы алгоритм быстрее адаптировался к новому фону (def. 0.1f)
+			this->motion.Settings.StillnessErrorClimbRate = 0.1f;
+		}*/
 	}
 
 	JoyShock(struct hid_device_info* dev, hid_device* inHandle, int uniqueHandle, const std::string& inPath) {
@@ -369,22 +394,17 @@ public:
 	void get_and_flush_cumulative_gyro(float& gyroX, float& gyroY, float& gyroZ) {
 		modifying_lock.lock();
 
-		//@304 --- НАЧАЛО ДЕБАГ-БЛОКА С ПРИНУДИТЕЛЬНЫМ ВЫВОДОМ ---
-		static int total_packets = 0;
-		static auto last_print_time = std::chrono::steady_clock::now();
-
-		total_packets += num_cumulative_gyro_samples;
+		//@304 ИНДИВИДУАЛЬНЫЙ ТЕСТ ГЕРЦОВКИ (Без static) c выводом в OSD
+		test_packet_count += num_cumulative_gyro_samples;
 
 		auto current_time = std::chrono::steady_clock::now();
-		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_print_time).count();
+		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - test_last_time).count();
 
-		if (elapsed >= 1000) { // Прошла 1 секунда (1000 мс)
-			printf("\n >>> REAL HW POLLING RATE: %d Hz <<<\n", total_packets);
-			fflush(stdout); // Принудительно выталкиваем текст из буфера на экран!
-			total_packets = 0;
-			last_print_time = current_time;
-		}
-		// --- КОНЕЦ ДЕБАГ-БЛОКА ---
+		if (elapsed >= 1000) {
+			current_polling_rate = test_packet_count; // Отдаем в публичную переменную
+			test_packet_count = 0;
+			test_last_time = current_time;
+		}		// КОНЕЦ ТЕСТА 
 
 		if (num_cumulative_gyro_samples == 0) {
 			gyroX = cumulative_gyro_x;

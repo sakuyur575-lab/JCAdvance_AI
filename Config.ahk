@@ -166,15 +166,23 @@ AddToggle(iniFile, sec, key, desc, pos := "") {
     CtrlSettings[key] := {type: "chk", ctrl: chk, file: iniFile, sec: sec}
 }
 
-AddInput(iniFile, sec, key, desc, defaultVal := "0", pos := "", labelWidth := 220, editWidth := 70) {
+AddInput(iniFile, sec, key, desc, defaultVal := "0", pos := "", labelWidth := 220, editWidth := 80, hasUpDown := true, udRange := "0-100") {
     val := IniRead(A_ScriptDir "\" iniFile, sec, key, defaultVal)
     
-    ; Задаем позицию для текста подписи
     txtOpt := (pos != "") ? pos " w" labelWidth : "xs+15 y+10 w" labelWidth
     MainGui.Add("Text", txtOpt, desc ":")
     
-    ; Поле ввода создается строго справа (x+10) и чуть выше (yp-"n") для компенсации высоты рамки поля
-    edt := MainGui.Add("Edit", "x+10 yp-2 w" editWidth " h18", val)
+    edt := MainGui.Add("Edit", "x+10 yp-3 w" editWidth, val)
+    
+    if (hasUpDown) {
+        try {
+            ; Используем переменную udRange!
+            MainGui.Add("UpDown", "Range" udRange, Integer(val))
+        } catch {
+            MainGui.Add("UpDown", "Range" udRange, 0)
+        }
+    }
+    
     CtrlSettings[key] := {type: "edt", ctrl: edt, file: iniFile, sec: sec}
 }
 
@@ -432,23 +440,23 @@ if (Layout == "Sony") {
 Tabs.UseTab("Special")
 
 ; 1. Начальная координата Y
-yPos := 55
+yPos := 60
 
 ; --- Группа 1: WHEEL ---
 MainGui.SetFont("cBlue Bold")
-MainGui.Add("GroupBox", "x155 y" yPos " w480 h220 Center Section", "Wheel")
+MainGui.Add("GroupBox", "x175 y" yPos " w480 h225 Center Section", "Wheel")
 MainGui.SetFont("cDefault Norm s10")
 
 ; Описание (обычный цвет текста)
-MainGui.Add("Text", "x170 y" (yPos+20) " w450", T("Gyro Wheel gestures for additional Xbox/KB+M buttons mapping. `nQuick press and release WHEEL-ACTIVATION button when gyro move:"))
+MainGui.Add("Text", "x190 y" (yPos+20) " w450", T("Gyro Wheel gestures for additional Xbox/KB+M buttons mapping. `nQuick press and release WHEEL-ACTIVATION button when gyro move:"))
 
-yPos += 55
+yPos += 60
 
 keyAct := "WHEEL-ACTIVATION"
 valAct := IniRead(A_ScriptDir "\" XboxIni, "Motion", keyAct, "NONE")
-MainGui.Add("Text", "x170 y" (yPos+4) " w200", keyAct T(" Button:"))
-btnAct := MainGui.Add("Button", "x+30 y" (yPos-1) " w60 h22", "Bind")
-ddlAct := MainGui.Add("ComboBox", "x+10 y" yPos " w150 Choose1", LayoutKeys)
+MainGui.Add("Text", "x190 y" (yPos+4) " w195", keyAct T(" Button:"))
+btnAct := MainGui.Add("Button", "x+0 y" (yPos-1) " w60 h22", "Bind")
+ddlAct := MainGui.Add("ComboBox", "x+45 y" yPos " w150 Choose1", LayoutKeys)
 SetDdlValue(ddlAct, valAct)
 CtrlWheel[keyAct] := {ddl: ddlAct} 
 btnAct.OnEvent("Click", BindGamepad.Bind(ddlAct))
@@ -470,15 +478,15 @@ for key in WheelMapping {
         val := valXbox
     }
 
-    MainGui.Add("Text", "x170 y" (yPos+4) " w150", key ":")
+    MainGui.Add("Text", "x190 y" (yPos+4) " w150", key ":")
     
     chkXbox := isKbm ? "" : " Checked1"
     chkKbm := isKbm ? " Checked1" : ""
     
-    radXbox := MainGui.Add("Radio", "x310 y" (yPos+3) chkXbox, "Xbox")
-    radKbm := MainGui.Add("Radio", "x370 y" (yPos+3) chkKbm, "KB/M")
+    radXbox := MainGui.Add("Radio", "x320 y" (yPos+3) chkXbox, "Xbox")
+    radKbm := MainGui.Add("Radio", "x385 y" (yPos+3) chkKbm, "KB/M")
     
-    ddl := MainGui.Add("ComboBox", "x470 y" yPos " w150 Choose1", isKbm ? KbmKeys : XboxKeys)
+    ddl := MainGui.Add("ComboBox", "x490 y" yPos " w150 Choose1", isKbm ? KbmKeys : XboxKeys)
     SetDdlValue(ddl, val)
     CtrlWheel[key] := {ddl: ddl, rXbox: radXbox, rKbm: radKbm}
 
@@ -492,18 +500,26 @@ for key in WheelMapping {
 yPos += 5
 keyDead := "MotionWheelButtonsDeadZone"
 valDead := IniRead(A_ScriptDir "\" ConfigIni, "Motion", keyDead, "12")
-MainGui.Add("Text", "x170 y" (yPos+4) " w290", T("Wheel Gesture DeadZone") ":")
-edtDead := MainGui.Add("Edit", "x470 y" yPos " w40", valDead)
+MainGui.Add("Text", "x190 y" (yPos+4) " w250", T("Wheel Gesture DeadZone") ":")
+edtDead := MainGui.Add("Edit", "x490 y" yPos " w45", valDead)
+
+try {
+    MainGui.Add("UpDown", "Range0-100", Integer(valDead)) ; Диапазон от 0 до 100
+} catch {
+    MainGui.Add("UpDown", "Range0-100", 0)
+}
+
 CtrlSettings[keyDead] := {type: "edt", ctrl: edtDead, file: ConfigIni, sec: "Motion"}
 
 ; --- Группа 2: Left STICK ---
-yPos += 50 
+
+yPos += 50
 
 MainGui.SetFont("cBlue Bold")
-MainGui.Add("GroupBox", "x155 y" yPos " w475 h120 Center Section", "Left Stick")
+MainGui.Add("GroupBox", "x175 y" yPos " w480 h120 Center Section", "Left Stick")
 MainGui.SetFont("cDefault Norm s10")
 
-MainGui.Add("Text", "x170 y" (yPos+20) " w450", T("The virtual button will be held down when stick is tilted to a certain degree (%) For example: Assign the run button to the stick's full travel"))
+MainGui.Add("Text", "x190 y" (yPos+20) " w450", T("The virtual button will be held down when stick is tilted to a certain degree (%) For example: Assign the run/sprint button to the stick's full travel"))
 
 yPos += 60
 
@@ -521,15 +537,15 @@ if (valKbmSprint != "NONE" && valKbmSprint != "") {
     valSprint := valXboxSprint
 }
 
-MainGui.Add("Text", "x170 y" (yPos+4) " w150", "AutoSprintButton:")
+MainGui.Add("Text", "x190 y" (yPos+4) " w150", "AutoSprintButton:")
 
 chkXboxSprint := isKbmSprint ? "" : " Checked1"
 chkKbmSprint := isKbmSprint ? " Checked1" : ""
 
-radXboxSprint := MainGui.Add("Radio", "x310 y" (yPos+3) chkXboxSprint, "Xbox")
-radKbmSprint := MainGui.Add("Radio", "x370 y" (yPos+3) chkKbmSprint, "KB/M")
+radXboxSprint := MainGui.Add("Radio", "x320 y" (yPos+3) chkXboxSprint, "Xbox")
+radKbmSprint := MainGui.Add("Radio", "x385 y" (yPos+3) chkKbmSprint, "KB/M")
 
-ddlSprint := MainGui.Add("ComboBox", "x470 y" yPos " w150 Choose1", isKbmSprint ? KbmKeys : XboxKeys) 
+ddlSprint := MainGui.Add("ComboBox", "x490 y" yPos " w150 Choose1", isKbmSprint ? KbmKeys : XboxKeys) 
 SetDdlValue(ddlSprint, valSprint)
 CtrlWheel["AutoSprintButton"] := {ddl: ddlSprint, rXbox: radXboxSprint, rKbm: radKbmSprint}
 
@@ -537,21 +553,28 @@ radXboxSprint.OnEvent("Click", ChangeWheelList.Bind(ddlSprint, XboxKeys))
 radKbmSprint.OnEvent("Click", ChangeWheelList.Bind(ddlSprint, KbmKeys))
 
 ; 2. AutoPressStickValue
-yPos += 25
+yPos += 30
 valStick := IniRead(A_ScriptDir "\" XboxIni, "SETTINGS", "AutoPressStickValue", "90")
-MainGui.Add("Text", "x170 y" (yPos+3) " w290", T("Button activation threshold (%)") ":")
-edtStick := MainGui.Add("Edit", "x470 y" yPos " w40", valStick)
+MainGui.Add("Text", "x190 y" (yPos+3) " w250", T("Auto Press Stick Value (%)") ":")
+edtStick := MainGui.Add("Edit", "x490 y" yPos " w45", valStick)
+
+try {
+    MainGui.Add("UpDown", "Range0-100", Integer(valStick)) ; Диапазон от 0 до 100
+} catch {
+    MainGui.Add("UpDown", "Range0-100", 0)
+}
+
 CtrlSettings["AutoPressStickValue"] := {type: "edt", ctrl: edtStick, file: XboxIni, sec: "SETTINGS"}
 
 ; --- Группа 3: Right STICK ---
-yPos += 50
+yPos += 45
 
 MainGui.SetFont("cBlue Bold")
-MainGui.Add("GroupBox", "x150 y" yPos " w480 h175 Center Section", "Right Stick")
+MainGui.Add("GroupBox", "x175 y" yPos " w480 h175 Center Section", "Right Stick")
 MainGui.SetFont("cDefault Norm s10")
 
 ; Описание (обычный цвет текста)
-MainGui.Add("Text", "x170 y" (yPos+20) " w450", T("Map virtual Xbox/KB+M buttons to Right Stick directions. `nOnly for Right Stick modes: as buttons/as triggers ('Analog' tab)"))
+MainGui.Add("Text", "x190 y" (yPos+20) " w450", T("Map virtual Xbox/KB+M buttons to Right Stick directions. `nOnly for Right Stick modes: as buttons/as triggers ('Analog' tab)"))
 
 yPos += 65
 
@@ -570,15 +593,15 @@ for key in RsButtonMapping {
         val := valXbox
     }
 
-    MainGui.Add("Text", "x170 y" (yPos+4) " w150", key ":")
+    MainGui.Add("Text", "x190 y" (yPos+4) " w150", key ":")
     
     chkXbox := isKbm ? "" : " Checked1"
     chkKbm := isKbm ? " Checked1" : ""
     
-    radXbox := MainGui.Add("Radio", "x310 y" (yPos+3) chkXbox, "Xbox")
-    radKbm := MainGui.Add("Radio", "x370 y" (yPos+3) chkKbm, "KB/M")
+    radXbox := MainGui.Add("Radio", "x320 y" (yPos+3) chkXbox, "Xbox")
+    radKbm := MainGui.Add("Radio", "x385 y" (yPos+3) chkKbm, "KB/M")
     
-    ddl := MainGui.Add("ComboBox", "x470 y" yPos " w150 Choose1", isKbm ? KbmKeys : XboxKeys)
+    ddl := MainGui.Add("ComboBox", "x490 y" yPos " w150 Choose1", isKbm ? KbmKeys : XboxKeys)
     SetDdlValue(ddl, val)
     CtrlWheel[key] := {ddl: ddl, rXbox: radXbox, rKbm: radKbm}
 
@@ -592,11 +615,11 @@ for key in RsButtonMapping {
 yPos += 25
 
 MainGui.SetFont("cBlue Bold")
-MainGui.Add("GroupBox", "x155 y" yPos " w480 h120 Center Section", "Melee")
+MainGui.Add("GroupBox", "x175 y" yPos " w480 h120 Center Section", "Melee")
 MainGui.SetFont("cDefault Norm s10")
 
 ; Описание (обычный цвет текста)
-MainGui.Add("Text", "x170 y" (yPos+20) " w450", T("Special 'Melee' gesture. Make a gesture: a punch, `na hook or a blow hammer to press virtual button:"))
+MainGui.Add("Text", "x190 y" (yPos+20) " w450", T("Special 'Melee' gesture. Make a gesture: a punch, `na hook or a blow hammer to press virtual button:"))
 
 yPos += 60
 	
@@ -614,15 +637,15 @@ if (valKbmMelee != "NONE" && valKbmMelee != "") {
     valMelee := valXboxMelee
 }
 
-MainGui.Add("Text", "x170 y" (yPos+4) " w150", "MELEE-GESTURE:")
+MainGui.Add("Text", "x190 y" (yPos+4) " w150", "MELEE-GESTURE:")
 
 chkXboxMelee := isKbmMelee ? "" : " Checked1"
 chkKbmMelee := isKbmMelee ? " Checked1" : ""
 
-radXboxMelee := MainGui.Add("Radio", "x310 y" (yPos+3) chkXboxMelee, "Xbox")
-radKbmMelee := MainGui.Add("Radio", "x370 y" (yPos+3) chkKbmMelee, "KB/M")
+radXboxMelee := MainGui.Add("Radio", "x320 y" (yPos+3) chkXboxMelee, "Xbox")
+radKbmMelee := MainGui.Add("Radio", "x385 y" (yPos+3) chkKbmMelee, "KB/M")
 
-ddlMelee := MainGui.Add("ComboBox", "x470 y" yPos " w150 Choose1", isKbmMelee ? KbmKeys : XboxKeys) 
+ddlMelee := MainGui.Add("ComboBox", "x490 y" yPos " w150 Choose1", isKbmMelee ? KbmKeys : XboxKeys) 
 SetDdlValue(ddlMelee, valMelee)
 CtrlWheel["MELEE-GESTURE"] := {ddl: ddlMelee, rXbox: radXboxMelee, rKbm: radKbmMelee}
 
@@ -630,10 +653,10 @@ radXboxMelee.OnEvent("Click", ChangeWheelList.Bind(ddlMelee, XboxKeys))
 radKbmMelee.OnEvent("Click", ChangeWheelList.Bind(ddlMelee, KbmKeys))
 
 ; 7. MeleeGForce
-yPos += 25
+yPos += 30
 valForce := IniRead(A_ScriptDir "\" ConfigIni, "Motion", "MeleeGForce", "5.0")
-MainGui.Add("Text", "x170 y" (yPos+3) " w250", T("Melee Gesture Force (g)") ":")
-edtForce := MainGui.Add("Edit", "x470 y" yPos " w40", valForce)
+MainGui.Add("Text", "x190 y" (yPos+3) " w250", T("Melee Gesture Force (g)") ":")
+edtForce := MainGui.Add("Edit", "x490 y" yPos " w40", valForce)
 CtrlSettings["MeleeGForce"] := {type: "edt", ctrl: edtForce, file: ConfigIni, sec: "Motion"}
 
 ChangeWheelList(ddl, listArray, *) {
@@ -650,48 +673,48 @@ Tabs.UseTab("Hotkeys")
 
 ; --- БОЛЬШАЯ ГРУППА 1: Gamepad Hotkeys ---
 MainGui.SetFont("cBlue Bold")
-MainGui.Add("GroupBox", "x195 y60 w480 h340 Center Section", T("Gamepad Hotkeys"))
+MainGui.Add("GroupBox", "x185 y60 w500 h340 Center Section", T("Gamepad Hotkeys"))
 MainGui.SetFont("cDefault Norm s10") ; Сброс на стандартный шрифт
 
 ; Подгруппа 1.1: Aiming
 MainGui.SetFont("Bold")
-MainGui.Add("Text", "xs+15 ys+30 w450", T("Aiming"))
+MainGui.Add("Text", "xs+30 ys+30 w450", T("Aiming"))
 MainGui.SetFont("Norm s10")
 
 ; Хоткеи подгруппы Aiming (позиционируются автоматически друг под другом)
-AddHotkey(ConfigIni, "Motion", "AimingToggleButton", T("Gyro Motion (On/Off)"), LayoutKeys, BindGamepad)
-AddHotkey(ConfigIni, "Motion", "AimingButton", T("Motion Control button"), LayoutKeys, BindGamepad)
-AddHotkey(ConfigIni, "Motion", "AimingModeToggleButton", T("Mode switching (Mouse/Stick)"), LayoutKeys, BindGamepad)
-;AddHotkey(ConfigIni, "Motion", "StickAsTriggerToggleButton", T("Right stick as triggers (On/Off)"), LayoutKeys, BindGamepad)
+AddHotkey(ConfigIni, "Motion", "AimingToggleButton", T("Gyro Motion (On/Off)"), LayoutKeys, BindGamepad, "xs+30 y+10")
+AddHotkey(XboxIni, "SETTINGS", "AimingButton", T("Motion Control (Ratchet) button"), LayoutKeys, BindGamepad, "xs+30 y+10")
+AddHotkey(ConfigIni, "Motion", "AimingModeToggleButton", T("Mode switching (Mouse/Stick)"), LayoutKeys, BindGamepad, "xs+30 y+10")
 
 ; тонкая горизонтальная линия-разделитель
-MainGui.Add("Text", "xs+15 y+20 w450 h2 0x10")
+MainGui.Add("Text", "xs+30 y+20 w450 h2 0x10")
 
 ; Подгруппа 1.2: Driving
 MainGui.SetFont("Bold")
-MainGui.Add("Text", "xs+15 y+18 w450", T("Driving"))
+MainGui.Add("Text", "xs+30 y+18 w450", T("Driving"))
 MainGui.SetFont("Norm s10")
 
-AddHotkey(ConfigIni, "Motion", "DrivingToggleButton", T("Driving Mode (On/Off)"), LayoutKeys, BindGamepad)
-AddHotkey(ConfigIni, "Motion", "DrivingCalibrationButton", T("Wheel Centering / Recalibration"), LayoutKeys, BindGamepad)
+AddHotkey(ConfigIni, "Motion", "DrivingToggleButton", T("Driving Mode (On/Off)"), LayoutKeys, BindGamepad, "xs+30 y+10")
+AddHotkey(ConfigIni, "Motion", "DrivingCalibrationButton", T("Wheel Centering / Recalibration"), LayoutKeys, BindGamepad, "xs+30 y+10")
 
-MainGui.Add("Text", "xs+15 y+20 w450 h2 0x10")
+MainGui.Add("Text", "xs+30 y+20 w450 h2 0x10")
 
 MainGui.SetFont("Bold")
-MainGui.Add("Text", "xs+15 y+18 w450", T("Misc"))
+MainGui.Add("Text", "xs+30 y+18 w450", T("Misc"))
 MainGui.SetFont("Norm s10")
-AddHotkey(ConfigIni, "Motion", "StickAsTriggerToggleButton", T("Right stick as triggers (On/Off)"), LayoutKeys, BindGamepad)
+AddHotkey(ConfigIni, "Gamepad", "StickAsTriggerToggleButton", T("Right stick as triggers (On/Off)"), LayoutKeys, BindGamepad, "xs+30 y+10")
 
 ; --- БОЛЬШАЯ ГРУППА 2: Keyboard Hotkeys ---
 MainGui.SetFont("cBlue Bold")
-MainGui.Add("GroupBox", "x195 y+55 w480 h110 Center Section", T("Keyboard Hotkeys"))
+MainGui.Add("GroupBox", "x185 y+55 w500 h135 Center Section", T("Keyboard Hotkeys"))
 MainGui.SetFont("cDefault Norm s10")
 
-AddHotkey(ConfigIni, "Gamepad", "ResetKey", T("Reset/Research Gamepad"), KbmKeys, BindKbm, "xs+15 ys+40")
+AddHotkey(ConfigIni, "SETTINGS", "ResetKey", T("Reset/Research Gamepad"), KbmKeys, BindKbm, "xs+30 ys+40")
 ;yPos += 30
-AddHotkey(ConfigIni, "Gamepad", "CalibrateKey", T("Gyroscope Recalibration *"), KbmKeys, BindKbm, "xs+15 ys+67")
+AddHotkey(ConfigIni, "SETTINGS", "OSDKey", T("On-screen display (on/off)"), KbmKeys, BindKbm, "xs+30 ys+67")
+AddHotkey(ConfigIni, "SETTINGS", "CalibrateKey", T("Gyroscope Recalibration *"), KbmKeys, BindKbm, "xs+30 ys+94")
 
-MainGui.Add("Text", "x25 y+165 w820 cRed", T("* Gyroscope Recalibration"))
+MainGui.Add("Text", "x25 y+145 w820 cRed", T("* Gyroscope Recalibration"))
 MainGui.Add("Text", "x25 y+5 w820", T("Place the device on a flat surface, press the button, and wait for the beep"))
 
 MainGui.Add("Text", "x25 y+7 w820 cRed", T("** Note:"))
@@ -707,41 +730,41 @@ MainGui.Add("GroupBox", "x210 y50 w410 h160 Center Section", T("Behavior and Set
 MainGui.SetFont("cDefault Norm s10")
 
 AddMappedDropdown(XboxIni, "SETTINGS", "AimingMode", T("Gyro mode by default"), [T("Right Stick"), T("Mouse")], Map(T("Right Stick"), "0", T("Mouse"), "1"), "xs+15 ys+25")
-AddMappedDropdown(XboxIni, "SETTINGS", "AimingByPressingMode", T("Press Control button to"), [T("stop motion tracking"), T("start motion tracking")], Map(T("stop motion tracking"), "0", T("start motion tracking"), "1"))
+AddMappedDropdown(XboxIni, "SETTINGS", "AimingByPressingMode", T("Press Control (Ratchet) button to"), [T("stop motion tracking"), T("start motion tracking")], Map(T("stop motion tracking"), "0", T("start motion tracking"), "1"))
 AddMappedDropdown(ConfigIni, "Motion", "GyroFromLeft", T("Gyro data in combined mode from"), [T("Right Joy-Con"), T("Left Joy-Con")], Map(T("Right Joy-Con"), "0", T("Left Joy-Con"), "1"))
-AddMappedDropdown(ConfigIni, "Gamepad", "SleepTimeOut", T("Polling rate (33.3 Hz for example)"), ["33.3 Hz", "66.7 Hz", "125 Hz", "250 Hz"], Map("33.3 Hz", "30", "66.7 Hz", "15", "125 Hz", "8", "250 Hz", "4"))
+AddMappedDropdown(ConfigIni, "SETTINGS", "SleepTimeOut", T("Polling rate (33.3 Hz for example)"), ["33.3 Hz", "66.7 Hz", "125 Hz", "250 Hz"], Map("33.3 Hz", "30", "66.7 Hz", "15", "125 Hz", "8", "250 Hz", "4"))
 AddMappedDropdown(ConfigIni, "Motion", "GyroSpace", T("Gyro Motion Space *"), ["0", "1", "2"], Map("0", "0", "1", "1", "2", "2"))
 
 ; --- Группа 2: Чувствительность и фильтрация ---
 MainGui.SetFont("cBlue Bold")
-MainGui.Add("GroupBox", "x210 y225 w410 h240 Center Section", T("Sensitivity and Filters"))
+MainGui.Add("GroupBox", "x270 y215 w300 h270 Center Section", T("Sensitivity and Filters"))
 MainGui.SetFont("cDefault Norm s10")
 
-AddInput(XboxIni, "SETTINGS", "MouseSensX", T("Mouse X"), "160", "xs+110 ys+25", 150, 40)
-AddInput(XboxIni, "SETTINGS", "MouseSensY", T("Mouse Y"), "150", "xs+110 y+10", 150, 40)
-AddInput(XboxIni, "SETTINGS", "JoySensX", T("Stick X"), "100", "xs+110 y+10", 150, 40)
-AddInput(XboxIni, "SETTINGS", "JoySensY", T("Stick Y"), "90", "xs+110 y+10", 150, 40)
-AddInput(ConfigIni, "Motion", "Tightening", T("Tightening **"), "5.0", "xs+110 y+10", 150, 40)
-AddInput(ConfigIni, "Motion", "RatchetDelayTime", T("Ratchet Delay (ms)"), "150", "xs+110 y+10", 150, 40)
-AddInput(ConfigIni, "Motion", "MouseSmooth", T("EMA*** for Mouse"), , "xs+110 y+10", 150, 40)
-AddInput(ConfigIni, "Motion", "JoySmooth", T("EMA*** for Stick"), , "xs+110 y+10", 150, 40)
+AddInput(XboxIni, "SETTINGS", "MouseSensX", T("Mouse X"), "180", "xs+45 ys+25", 150, 45, true, "0-999")
+AddInput(XboxIni, "SETTINGS", "MouseSensY", T("Mouse Y"), "170", "xs+45 ys+55", 150, 45, true, "0-999")
+AddInput(XboxIni, "SETTINGS", "JoySensX", T("Stick X"), "120", "xs+45 y+10", 150, 45, true, "0-999")
+AddInput(XboxIni, "SETTINGS", "JoySensY", T("Stick Y"), "120", "xs+45 y+10", 150, 45, true, "0-999")
+AddInput(ConfigIni, "Motion", "RatchetDelayTime", T("Ratchet Delay (ms)"), "150", "xs+45 y+10", 150, 45, true, "0-999")
+AddInput(ConfigIni, "Motion", "Tightening", T("Tightening **"), "5.0", "xs+45 y+10", 150, 45)
+AddInput(ConfigIni, "Motion", "MouseSmooth", T("EMA*** for Mouse"), , "xs+45 y+10", 150, 45)
+AddInput(ConfigIni, "Motion", "JoySmooth", T("EMA*** for Stick"), , "xs+45 y+10", 150, 45)
 
 ; --- Сноски и примечания (внизу вкладки) ---
-MainGui.Add("Text", "x20 y+20 w820 cRed", "* Gyro Space (by Jibb Smart):")
-MainGui.Add("Text", "x20 y+3 w820", T("This setting controls how gyroscope data from hand movements is processed and translated into cursor or stick input."))
-MainGui.Add("Text", "x20 y+10 w820", T("For two-handed controllers, the difference only affects horizontal (X-axis) aiming. To move the cursor/stick left or right:"))
+MainGui.Add("Text", "x20 y+15 w820 cRed", "* Gyro Space (by Jibb Smart):")
+MainGui.Add("Text", "x20 y+2 w820", T("This setting controls how gyroscope data from hand movements is processed and translated into cursor or stick input."))
+MainGui.Add("Text", "x20 y+5 w820", T("For two-handed controllers, the difference only affects horizontal (X-axis) aiming. To move the cursor/stick left or right:"))
 MainGui.Add("Text", "x20 y+5 w820", T("0 — Turn the controller like a car steering wheel (Roll)"))
 MainGui.Add("Text", "x20 y+2 w820", T("2 — Twist the controller like tank steering levers (Yaw)"))
-MainGui.Add("Text", "x20 y+10 w820", T("For Joy-Cons, different rules apply. This setting dictates how wrist angle (clockwise/counter-clockwise Roll) `nand grip (horizontal or vertical) will skew cursor/stick movement relative to your arm's motion. Choose one:"))
+MainGui.Add("Text", "x20 y+7 w820", T("For Joy-Cons, different rules apply. This setting dictates how wrist angle (clockwise/counter-clockwise Roll) `nand grip (horizontal or vertical) will skew cursor/stick movement relative to your arm's motion. Choose one:"))
 MainGui.Add("Text", "x20 y+5 w820", T("0 — Wrist angle always affects to the cursor/stick’s movement relative to the movement of the hand (axis offset)"))
 MainGui.Add("Text", "x20 y+2 w820", T("1 — Wrist angle between -90 and 90 degrees has no effect and the cursor/stick accurately follows your hand"))
-MainGui.Add("Text", "x20 y+10 w820", T("Mode '1' and a horizontal grip (ZR pointing at the screen) provide the best accuracy and predictability of control"))
+MainGui.Add("Text", "x20 y+7 w820", T("Mode '1' and a horizontal grip (ZR pointing at the screen) provide the best accuracy and predictability of control"))
 
 MainGui.Add("Text", "x20 y+7 w820 cRed", T("** Tightening:"))
-MainGui.Add("Text", "x20 y+1 w820", T("Is a zero-latency, velocity-based threshold filter (by JibbSmart) that attenuates micro-movements to eliminate hand `ntremors nand pulse twitches and hardware sensor noise. 0 - Disabled; 1 - 2 for Sony gamepads, 2 - 5 for Joy-cons"))
+MainGui.Add("Text", "x20 y+1 w820", T("Is a zero-latency, velocity-based threshold filter (by JibbSmart) that attenuates micro-movements to eliminate hand `ntremors, pulse twitches and hardware sensor noise. 0 - Disabled; 1 - 2 for Sony gamepads, 2 - 5 for Joy-cons"))
 
-MainGui.Add("Text", "x20 y+7 w820 cRed", T(" *** Caution:"))
-MainGui.Add("Text", "x20 y+1 w820", T("EMA smooth filter add input latency. For 60fps games (value - latency): 25   ~2.7ms;  50   ~8ms;  75   ~24ms"))
+MainGui.Add("Text", "x20 y+7 w820 cRed", T(" *** EMA Filter:"))
+MainGui.Add("Text", "x20 y+1 w820", T("Smoothing time to reach 100% speed (value - rise time): 25   ~2.7ms;  50   ~8ms;  75   ~24ms"))
 
 ; =========================================
 ; TAB 6:Analog (config.ini)
@@ -753,26 +776,26 @@ MainGui.SetFont("cBlue Bold")
 MainGui.Add("GroupBox", "x25 y50 w380 h230 Center Section", T("Left Hand"))
 MainGui.SetFont("cDefault Norm s10")
 
-AddInput(XboxIni, "SETTINGS", "DeadZoneLeftTrigger", T("DeadZone Left Trigger (0-100)"), , "xs+55 ys+30", 210, 40)
-AddInput(XboxIni, "SETTINGS", "DeadZoneLeftStickX", T("DeadZone Left Stick X (0-100)"), , "xs+55 y+8", 210, 40)
-AddInput(XboxIni, "SETTINGS", "DeadZoneLeftStickY", T("DeadZone Left Stick Y (0-100)"), , "xs+55 y+8", 210, 40)
-AddInput(XboxIni, "SETTINGS", "LinearityLeftStickX", T("Linearity* Left Stick X (0-100)"), "50", "xs+55 y+8", 210, 40)
-AddInput(XboxIni, "SETTINGS", "LinearityLeftStickY", T("Linearity* Left Stick Y (0-100)"), "50", "xs+55 y+8", 210, 40)
-AddToggle(XboxIni, "SETTINGS", "InvertLeftStickX", T("Invert Left Stick X"), "xs+55 y+10")
-AddToggle(XboxIni, "SETTINGS", "InvertLeftStickY", T("Invert Left Stick Y"), "xs+55 y+8")
+AddInput(XboxIni, "SETTINGS", "DeadZoneLeftTrigger", T("DeadZone Left Trigger"), , "xs+75 ys+30", 180, 42)
+AddInput(XboxIni, "SETTINGS", "DeadZoneLeftStickX", T("DeadZone Left Stick X"), , "xs+75 y+8", 180, 42)
+AddInput(XboxIni, "SETTINGS", "DeadZoneLeftStickY", T("DeadZone Left Stick Y"), , "xs+75 y+8", 180, 42)
+AddInput(XboxIni, "SETTINGS", "LinearityLeftStickX", T("Linearity* Left Stick X"), "50", "xs+75 y+8", 180, 42)
+AddInput(XboxIni, "SETTINGS", "LinearityLeftStickY", T("Linearity* Left Stick Y"), "50", "xs+75 y+8", 180, 42)
+AddToggle(XboxIni, "SETTINGS", "InvertLeftStickX", T("Invert Left Stick X"), "xs+75 y+10")
+AddToggle(XboxIni, "SETTINGS", "InvertLeftStickY", T("Invert Left Stick Y"), "xs+75 y+8")
 
 ; --- Группа 2: RIGHT HAND (Правая колонка сверху) ---
 MainGui.SetFont("cBlue Bold")
 MainGui.Add("GroupBox", "x425 y50 w380 h230 Center Section", T("Right Hand"))
 MainGui.SetFont("cDefault Norm s10")
 
-AddInput(XboxIni, "SETTINGS", "DeadZoneRightTrigger", T("DeadZone Right Trigger (0-100)"), , "xs+55 ys+30", 210, 40)
-AddInput(XboxIni, "SETTINGS", "DeadZoneRightStickX", T("DeadZone Right Stick X (0-100)"), , "xs+55 y+8", 210, 40)
-AddInput(XboxIni, "SETTINGS", "DeadZoneRightStickY", T("DeadZone Right Stick Y (0-100)"), , "xs+55 y+8", 210, 40)
-AddInput(XboxIni, "SETTINGS", "LinearityRightStickX", T("Linearity* Right Stick X (0-100)"), "50", "xs+55 y+8", 210, 40)
-AddInput(XboxIni, "SETTINGS", "LinearityRightStickY", T("Linearity* Right Stick Y (0-100)"), "50", "xs+55 y+8", 210, 40)
-AddToggle(XboxIni, "SETTINGS", "InvertRightStickX", T("Invert Right Stick X"), "xs+55 y+10")
-AddToggle(XboxIni, "SETTINGS", "InvertRightStickY", T("Invert Right Stick Y"), "xs+55 y+8")
+AddInput(XboxIni, "SETTINGS", "DeadZoneRightTrigger", T("DeadZone Right Trigger"), , "xs+75 ys+30", 180, 40)
+AddInput(XboxIni, "SETTINGS", "DeadZoneRightStickX", T("DeadZone Right Stick X"), , "xs+75 y+8", 180, 40)
+AddInput(XboxIni, "SETTINGS", "DeadZoneRightStickY", T("DeadZone Right Stick Y"), , "xs+75 y+8", 180, 40)
+AddInput(XboxIni, "SETTINGS", "LinearityRightStickX", T("Linearity* Right Stick X"), "50", "xs+75 y+8", 180, 40)
+AddInput(XboxIni, "SETTINGS", "LinearityRightStickY", T("Linearity* Right Stick Y"), "50", "xs+75 y+8", 180, 40)
+AddToggle(XboxIni, "SETTINGS", "InvertRightStickX", T("Invert Right Stick X"), "xs+75 y+10")
+AddToggle(XboxIni, "SETTINGS", "InvertRightStickY", T("Invert Right Stick Y"), "xs+75 y+8")
 
 ; --- Группа 3: HARDWARE SWAPS (Центрирована, построчно) ---
 MainGui.SetFont("cBlue Bold")
@@ -821,10 +844,10 @@ MainGui.SetFont("cBlue Bold")
 MainGui.Add("GroupBox", "x175 y+50 w480 Center h70 Section", T("Others"))
 MainGui.SetFont("cDefault Norm s10")
 
-AddInput(ConfigIni, "Gamepad", "RumbleStrength", T("Rumble strength (0-100)"), , "xs+125 ys+30", 170, 75)
+AddInput(ConfigIni, "Gamepad", "RumbleStrength", T("Rumble strength"), , "xs+165 ys+30", 110, 45)
 
 ; --- Сноски и примечания (внизу вкладки) ---
-MainGui.Add("Text", "x25 y+95 w800 cRed", T("* Linearity"))
+MainGui.Add("Text", "x25 y+75 w800 cRed", T("* Linearity"))
 MainGui.Add("Text", "x25 y+5 w820", T("Adjusts stick sensitivity curve:"))
 MainGui.Add("Text", "x25 y+5 w820", T("0: Lower sensitivity near the center for precise aiming (Exponential)"))
 MainGui.Add("Text", "x25 y+5 w820", T("50 (Default): Perfectly linear response"))
@@ -844,7 +867,7 @@ MainGui.SetFont("cBlue Bold")
 MainGui.Add("GroupBox", "x175 y+30 w480 h115 Center Section", T("Wheel settings (Driving mode)"))
 MainGui.SetFont("cDefault Norm s10")
 
-AddInput(XboxIni, "SETTINGS", "SteeringWheelAngle", T("Steering Wheel Angle"), , "xs+135 ys+40", 160, 50)
+AddInput(XboxIni, "SETTINGS", "SteeringWheelAngle", T("Steering Wheel Angle"), , "xs+135 ys+40", 160, 50, true, "0-360")
 AddInput(XboxIni, "SETTINGS", "LinearityWheel", T("Steering Wheel Linearity"), , "xs+135 y+10", 160, 50)
 
 ; --- ГРУППА 2: External Pedals Settings ---
@@ -865,14 +888,15 @@ for axis in AxesList {
 AddMappedDropdown(ConfigIni, "ExternalPedals", "Pedal1Axis", T("Pedal 1 Axis"), AxesList, AxesMap, "xs+135 y+10", 110, 105)
 AddMappedDropdown(ConfigIni, "ExternalPedals", "Pedal2Axis", T("Pedal 2 Axis"), AxesList, AxesMap, "xs+135 y+10", 110, 105)
 
-AddInput(ConfigIni, "ExternalPedals", "DeviceName", T("Device Name"), "AUTO", "xs+15 y+30", 110, 340)
+;AddInput(ConfigIni, "ExternalPedals", "DeviceName", T("Device Name"), "AUTO", "xs+15 y+30", 110, 340)
+AddInput(ConfigIni, "ExternalPedals", "DeviceName", T("Device Name"), "AUTO", "xs+15 y+30", 110, 340, false)
 
-MainGui.Add("Text", "x25 y+220 w820 cRed", T("External Pedals:"))
+MainGui.Add("Text", "x25 y+210 w820 cRed", T("External Pedals:"))
 MainGui.Add("Text", "x25 y+5 w820", T("Use pedals as analog triggers. Note: This is an experimental feature; proper functioning is not guaranteed."))
 MainGui.Add("Text", "x25 y+5 w820", T("Connect your wheel/pedals, set DirectInput search to On and launch JCAdvance. If you see message: `n'[Pedals Search] ID 0: Found device 'Your wheel/pedlas name' -> APPROVED!', configure the correct pedal axes and you've golden."))
 MainGui.Add("Text", "x25 y+5 w820", T("If you can't see your wheel/pedals name, replace AUTO with your device's name exactly as it appears in joy.cpl"))
 
-MainGui.Add("Text", "x25 y+5 w820 cRed", T("* Emulated Controller: DS4 Mode for Nintendo controllers only"))
+MainGui.Add("Text", "x25 y+5 w820 cRed", T("* Emulated Controller: DS4 Mode for Nintendo gamepads only"))
 MainGui.Add("Text", "x25 y+5 w820", T("For DirectInput games, like Half-Life 2, F.E.A.R., NFS classic series, you can change the controller type to DS4. When you launch JCAdvacne, ‘Wireless Controller’ will appear instead of ‘Xbox 360 Controller’"))
 
 ; =========================================

@@ -181,7 +181,7 @@ static void EncodeRumble(unsigned char* data, float freq, float amp) {
 }
 
 // https://github.com/fossephate/JoyCon-Driver/blob/main/joycon-driver/include/Joycon.hpp
-void JoyConSimpleRumble(hid_device* jcHandle, bool IsLeft, unsigned char MotorValue)
+/*void JoyConSimpleRumble(hid_device* jcHandle, bool IsLeft, unsigned char MotorValue)
 {
 	unsigned char outputReport[64] = { 0 };
 
@@ -211,25 +211,29 @@ void JoyConSimpleRumble(hid_device* jcHandle, bool IsLeft, unsigned char MotorVa
 	}
 
 	hid_write(jcHandle, outputReport, sizeof(outputReport));
-}
+}*/
 
-// Прямая, неблокирующая смена светодиодов (Bypass JSL Mutex)
-void JoyConSetLED(hid_device* jcHandle, bool IsLeft, unsigned char ledMask)
+void JoyConSimpleRumble(hid_device* jcHandle, bool IsLeft, unsigned char MotorValue)
 {
-	if (jcHandle == NULL) return;
 	unsigned char outputReport[64] = { 0 };
 
-	outputReport[0] = 0x01; // Команда: Subcommand
-	outputReport[1] = (IsLeft ? PrimaryGamepad.PacketCounter++ : PrimaryGamepad.PacketCounter2++) & 0x0f;
+	outputReport[0] = 0x10;
+	outputReport[1] = (IsLeft ? PrimaryGamepad.PacketCounter++ : PrimaryGamepad.PacketCounter2++) & 0x0f;	//@019 RumbleFix
 
-	// Нейтральная вибрация (чтобы моторы не дернулись)
+	// ЖЕСТКО устанавливаем нейтральную вибрацию для ОБЕИХ сторон по умолчанию (защита от щелчков/игнора)
 	outputReport[2] = 0x00; outputReport[3] = 0x01; outputReport[4] = 0x40; outputReport[5] = 0x40;
 	outputReport[6] = 0x00; outputReport[7] = 0x01; outputReport[8] = 0x40; outputReport[9] = 0x40;
 
-	outputReport[10] = 0x30; // Сабкоманда 0x30 (Player LED)
-	outputReport[11] = ledMask; // Маска светодиодов (1, 3, 15 и т.д.)
+	// Если сигнал есть, перезаписываем только активную сторону
+	if (MotorValue > 0) {
+		if (IsLeft) {
+			EncodeRumble(&outputReport[2], MotorFreqFromStrength(MotorValue), (MotorValue * PrimaryGamepad.RumbleStrength * 0.9f) / 25500.0f);
+		}
+		else { // Is right
+			EncodeRumble(&outputReport[6], MotorFreqFromStrength(MotorValue), (MotorValue * PrimaryGamepad.RumbleStrength * 0.9f) / 25500.0f);
+		}
+	}
 
-	// Мгновенная отправка без ожидания ответа!
 	hid_write(jcHandle, outputReport, 64);
 }
 
@@ -571,46 +575,6 @@ void GamepadSetState(AdvancedGamepad &Gamepad)
 	else if (Gamepad.ControllerType == NINTENDO_JOYCONS && !Gamepad.USBConnection) {
 		
 		if (Gamepad.RumbleStrength != 0) {
-			// Left JoyCon
-			/*unsigned char outputReportLeft[64] = { 0 };
-			outputReportLeft[0] = 0x10;
-			outputReportLeft[1] = Gamepad.PacketCounter++ & 0x0f;
-			outputReportLeft[6] = 0x00;
-			outputReportLeft[7] = 0x01;
-			outputReportLeft[8] = 0x40;
-			outputReportLeft[9] = 0x40;
-
-			if (OutState.LargeMotor == 0) {
-				outputReportLeft[2] = 0x00;
-				outputReportLeft[3] = 0x01;
-				outputReportLeft[4] = 0x40;
-				outputReportLeft[5] = 0x40;
-			} else
-				EncodeRumble(&outputReportLeft[2], MotorFreqFromStrength(Gamepad.OutState.LargeMotor), (Gamepad.OutState.LargeMotor * Gamepad.RumbleStrength * 0.9f) / 25500.0f);
-			hid_write(Gamepad.HidHandle, outputReportLeft, sizeof(outputReportLeft));
-
-			// Right JoyCon
-			if (Gamepad.HidHandle2) {
-				unsigned char outputReportRight[64] = { 0 };
-				outputReportRight[0] = 0x10;
-				outputReportRight[1] = Gamepad.PacketCounter++ & 0x0f;
-
-				outputReportRight[6] = 0x00;
-				outputReportRight[7] = 0x01;
-				outputReportRight[8] = 0x40;
-				outputReportRight[9] = 0x40;
-
-				if (OutState.SmallMotor == 0) {
-					outputReportRight[6] = 0x00;
-					outputReportRight[7] = 0x01;
-					outputReportRight[8] = 0x40;
-					outputReportRight[9] = 0x40;
-				}
-				else
-					EncodeRumble(&outputReportRight[6], MotorFreqFromStrength(Gamepad.OutState.SmallMotor), (Gamepad.OutState.LargeMotor * Gamepad.RumbleStrength * 0.9f) / 25500.0f);
-
-				hid_write(Gamepad.HidHandle2, outputReportRight, sizeof(outputReportRight));
-			}*/
 			if (Gamepad.HidHandle != NULL)	//@019 RubleFix выбирать самый сильный сигнал, а не делить пополам
 				//JoyConSimpleRumble(Gamepad.HidHandle, true, AppStatus.JoyconRumbleMerge == false ? Gamepad.OutState.LargeMotor : (Gamepad.OutState.LargeMotor + Gamepad.OutState.SmallMotor) / 2);			
 				JoyConSimpleRumble(Gamepad.HidHandle, true, AppStatus.JoyconRumbleMerge == false ? Gamepad.OutState.LargeMotor : (Gamepad.OutState.LargeMotor > Gamepad.OutState.SmallMotor ? Gamepad.OutState.LargeMotor : Gamepad.OutState.SmallMotor));
@@ -633,13 +597,7 @@ void GamepadSetState(AdvancedGamepad &Gamepad)
 					hid_write(Gamepad.HidHandle, outputReport, 64);
 			}
 		}
-	} //else {
-		//if (JslGetControllerType(0) == JS_TYPE_DS || JslGetControllerType(0) == JS_TYPE_DS4)
-			//JslSetLightColour(0, (std::clamp(Gamepad.OutState.LEDRed - Gamepad.OutState.LEDBrightness, 0, 255) << 16) + (std::clamp(Gamepad.OutState.LEDGreen - Gamepad.OutState.LEDBrightness, 0, 255) << 8) + std::clamp(Gamepad.OutState.LEDBlue - Gamepad.OutState.LEDBrightness, 0, 255)); // https://github.com/CyberPlaton/_Nautilus_/blob/master/Engine/PSGamepad.cpp
-		//JslSetRumble(0, (unsigned int)Gamepad.OutState.LargeMotor * Gamepad.RumbleStrength / 100, (unsigned int)Gamepad.OutState.SmallMotor * Gamepad.RumbleStrength / 100); // Not working with DualSense USB connection
-	//}
-	//else // Unknown controllers - Pro controller, Joy-cons
-		//JslSetRumble(0, (unsigned int)Gamepad.OutState.LargeMotor * Gamepad.RumbleStrength / 100, (unsigned int)Gamepad.OutState.SmallMotor * Gamepad.RumbleStrength / 100);
+	}
 }
 
 void UpdateBatteryInfo(AdvancedGamepad &Gamepad) {
@@ -1056,7 +1014,7 @@ void KMStickMode(AdvancedGamepad &Gamepad, bool DontResetInputState, bool StickI
 	}
 }
 
-void SeamlessGyroReset(int deviceIndex) {
+/*void SeamlessGyroReset(int deviceIndex) {	//@059
 	if (deviceIndex == -1) return;
 
 	float offsetX, offsetY, offsetZ;
@@ -1069,44 +1027,107 @@ void SeamlessGyroReset(int deviceIndex) {
 
 	// 3. Возвращаем поправку обратно! (Игрок ничего не заметит)
 	JslSetCalibrationOffset(deviceIndex, offsetX, offsetY, offsetZ);
-}
+}*/
 
 void LoadConfig() {	//@057 Читаем конфиг во время работы (по дате файла) и применяем изменения (в main)
 	CIniReader IniFile("Config.ini");
-	AppStatus.GyroSpace = IniFile.ReadInteger("Motion", "GyroSpace", 1);
-	PrimaryGamepad.Motion.Tightening = IniFile.ReadFloat("Motion", "Tightening", 2.0f);
-	PrimaryGamepad.Motion.MouseSmooth = ClampFloat(IniFile.ReadFloat("Motion", "MouseSmooth", 0), 0, 99) * 0.01f;
-	PrimaryGamepad.Motion.JoySmooth = ClampFloat(IniFile.ReadFloat("Motion", "JoySmooth", 0), 0, 99) * 0.01f;
-	PrimaryGamepad.Motion.RatchetDelayTime = IniFile.ReadFloat("Motion", "RatchetDelayTime", 150.0f);	//@058 Clutch Smoothing 
-	PrimaryGamepad.Motion.MotionWheelButtonsDeadZone = IniFile.ReadFloat("Motion", "MotionWheelButtonsDeadZone", 12.0f);
-	AppStatus.MeleeGForce = IniFile.ReadFloat("Motion", "MeleeGForce", 3.0f); // У тебя в коде дефолт 3.0, но читает из конфига
-	AppStatus.GyroFromLeft = IniFile.ReadBoolean("Motion", "GyroFromLeft", false);
+	AppStatus.HotKeys.ResetKeyName = IniFile.ReadString("SETTINGS", "ResetKey", "NONE");
+	AppStatus.HotKeys.ResetKey = KeyNameToKeyCode(AppStatus.HotKeys.ResetKeyName);
+	AppStatus.AutoCalibrationEnabled = IniFile.ReadBoolean("SETTINGS", "AutoCalibrationEnabled", true);	//@050
+	AppStatus.HotKeys.CalibrateKeyName = IniFile.ReadString("SETTINGS", "CalibrateKey", "NONE");
+	AppStatus.HotKeys.CalibrateKey = KeyNameToKeyCode(AppStatus.HotKeys.CalibrateKeyName);
+	AppStatus.BackgroundCalibSound = IniFile.ReadBoolean("SETTINGS", "BackgroundCalibSound", false);
+	AppStatus.HotKeys.OSDKey = KeyNameToKeyCode(IniFile.ReadString("SETTINGS", "OSDKey", "NONE"));		//@060
+
+	
+	//@005 Двухкнопочный Binding для переключения режимов + чтение из Config, юзается новый парсинг в .h + условия активации toggle-функций в main (buttons & mask) == mask. )
+	AppStatus.AimingByPressingMode = IniFile.ReadBoolean("Motion", "AimingByPressingMode", true);
+	//AppStatus.AimingButtonName = IniFile.ReadString("Motion", "AimingButton", "NONE");	//в профиле
+	//AppStatus.AimingButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.AimingButtonName);
 	AppStatus.AimingToggleButtonName = IniFile.ReadString("Motion", "AimingToggleButton", "NONE");
 	AppStatus.AimingToggleButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.AimingToggleButtonName);
-	AppStatus.AimingButtonName = IniFile.ReadString("Motion", "AimingButton", "NONE");
-	AppStatus.AimingButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.AimingButtonName);
-	AppStatus.AimingModeToggleButtonName = IniFile.ReadString("Motion", "AimingModeToggleButton", "NONE");
+	AppStatus.AimingModeToggleButtonName = (IniFile.ReadString("Motion", "AimingModeToggleButton", "NONE"));
 	AppStatus.AimingModeToggleButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.AimingModeToggleButtonName);
 	AppStatus.DrivingToggleButtonName = IniFile.ReadString("Motion", "DrivingToggleButton", "NONE");
-	AppStatus.DrivingToggleButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.DrivingToggleButtonName);
+	AppStatus.DrivingToggleButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.DrivingToggleButtonName);	//@045
 	AppStatus.DrivingCalibrationButtonName = IniFile.ReadString("Motion", "DrivingCalibrationButton", "NONE");
 	AppStatus.DrivingCalibrationButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.DrivingCalibrationButtonName);
-	AppStatus.StickAsTriggerToggleButtonName = IniFile.ReadString("Motion", "StickAsTriggerToggleButton", "NONE");
-	AppStatus.StickAsTriggerToggleButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.StickAsTriggerToggleButtonName);
-	AppStatus.HotKeys.ResetKeyName = IniFile.ReadString("Gamepad", "ResetKey", "NONE");
-	AppStatus.HotKeys.ResetKey = KeyNameToKeyCode(AppStatus.HotKeys.ResetKeyName);
-	AppStatus.HotKeys.CalibrateKeyName = IniFile.ReadString("Gamepad", "CalibrateKey", "NONE");
-	AppStatus.HotKeys.CalibrateKey = KeyNameToKeyCode(AppStatus.HotKeys.CalibrateKeyName);
+	AppStatus.StickAsTriggerToggleButtonName = IniFile.ReadString("Gamepad", "StickAsTriggerToggleButton", "NONE");
+	AppStatus.StickAsTriggerToggleButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.StickAsTriggerToggleButtonName);	//@047
+	
+	AppStatus.MeleeGForce = IniFile.ReadFloat("Motion", "MeleeGForce", 3.0f); //@043
+	AppStatus.GyroFromLeft = IniFile.ReadBoolean("Motion", "GyroFromLeft", false);		//@024 Gyro левша
+
+	PrimaryGamepad.Motion.Tightening = IniFile.ReadFloat("Motion", "Tightening", 2.0f); //@030
+	PrimaryGamepad.Motion.MouseSmooth = ClampFloat(IniFile.ReadFloat("Motion", "MouseSmooth", 0), 0, 99) * 0.01f; //@029 EMA Filter
+	PrimaryGamepad.Motion.JoySmooth = ClampFloat(IniFile.ReadFloat("Motion", "JoySmooth", 0), 0, 99) * 0.01f;
+	PrimaryGamepad.Motion.RatchetDelayTime = IniFile.ReadFloat("Motion", "RatchetDelayTime", 150.0f);	//@058 Clutch Smoothing
+	PrimaryGamepad.Motion.MotionWheelButtonsDeadZone = IniFile.ReadFloat("Motion", "MotionWheelButtonsDeadZone", 12.0f);
+
+	AppStatus.SplitJoycons = IniFile.ReadBoolean("Gamepad", "SplitJoycons", false);	//@040 Joy-con split Mode
+	PrimaryGamepad.Sticks.InvertLeftXY = IniFile.ReadBoolean("Gamepad", "InvertLeftStickXY", false);	//@041
+	PrimaryGamepad.Sticks.InvertRightXY = IniFile.ReadBoolean("Gamepad", "InvertRightStickXY", false);
+
 	PrimaryGamepad.RumbleStrength = IniFile.ReadInteger("Gamepad", "RumbleStrength", 100);
-	AppStatus.SleepTimeOut = IniFile.ReadInteger("Gamepad", "SleepTimeOut", 15);
-	AppStatus.SkipPollTimeOut = SkipPollTimeOutMS / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);
-	AppStatus.PSReleasedTimeOut = PSReleasedTimeOutMS / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);
-	AppStatus.ButtonCheckTimeOut = ButtonReleasedTimeOutMS / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);
-	AppStatus.FrameTime = AppStatus.SleepTimeOut / 1000.0f;
-	AppStatus.ExternalPedalsDInputSearch = IniFile.ReadBoolean("ExternalPedals", "DInput", false);
-	AppStatus.ExternalPedalsDeviceName = IniFile.ReadString("ExternalPedals", "DeviceName", "AUTO");
-	AppStatus.Pedal1Axis = ParseAxisName(IniFile.ReadString("ExternalPedals", "Pedal1Axis", "V"));
-	AppStatus.Pedal2Axis = ParseAxisName(IniFile.ReadString("ExternalPedals", "Pedal2Axis", "U"));
+
+	PrimaryGamepad.TouchSticksOn = IniFile.ReadBoolean("Gamepad", "TouchSticksOn", false);
+	PrimaryGamepad.TouchSticks.LeftX = IniFile.ReadFloat("Gamepad", "TouchLeftStickSensX", 5.0f);
+	PrimaryGamepad.TouchSticks.LeftY = IniFile.ReadFloat("Gamepad", "TouchLeftStickSensY", 5.0f);
+	PrimaryGamepad.TouchSticks.RightX = IniFile.ReadFloat("Gamepad", "TouchRightStickSensX", 1.0f);
+	PrimaryGamepad.TouchSticks.RightY = IniFile.ReadFloat("Gamepad", "TouchRightStickSensY", 1.0f);
+
+	PrimaryGamepad.DefaultLEDBrightness = std::clamp((int)(255 - IniFile.ReadInteger("Gamepad", "DefaultBrightness", 100) * 2.55), 0, 255);
+	PrimaryGamepad.OutState.LEDBrightness = PrimaryGamepad.DefaultLEDBrightness;
+
+	PrimaryGamepad.Motion.AircraftEnabled = IniFile.ReadBoolean("Motion", "AircraftEnabled", false);
+	PrimaryGamepad.Motion.AircraftPitchAngle = IniFile.ReadFloat("Motion", "AircraftPitchAngle", 45) / 2.0f;
+	PrimaryGamepad.Motion.AircraftPitchInverted = IniFile.ReadBoolean("Motion", "AircraftPitchInverted", false) ? -1 : 1;
+	PrimaryGamepad.Motion.AircraftRollSens = IniFile.ReadFloat("Motion", "AircraftRollSens", 100) * 0.11875f;
+
+	AppStatus.LockedChangeBrightness = IniFile.ReadBoolean("Gamepad", "LockChangeBrightness", false);
+	AppStatus.ChangeModesWithClick = IniFile.ReadBoolean("Gamepad", "ChangeModesWithClick", true);
+	AppStatus.ChangeModesWithoutAreas = IniFile.ReadBoolean("Gamepad", "ChangeModesWithoutAreas", false);
+	AppStatus.JoyconChangeModesWithButton = SonyNintendoKeyNameToJoyShockKeyCode(IniFile.ReadString("Gamepad", "JoyconChangeModesWithButton", "NONE"));
+	AppStatus.JoyconRumbleMerge = IniFile.ReadBoolean("Gamepad", "JoyconRumbleMerge", false);
+
+	SecondaryGamepad.Sticks.DeadZoneLeftX = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneLeftStickX", 0) * 0.01f;	//@010
+	SecondaryGamepad.Sticks.DeadZoneLeftX = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneLeftStickX", 0) * 0.01f;
+	SecondaryGamepad.Sticks.DeadZoneLeftX = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneLeftStickX", 0) * 0.01f;
+	SecondaryGamepad.Sticks.DeadZoneLeftY = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneLeftStickY", 0) * 0.01f;
+	SecondaryGamepad.Sticks.DeadZoneRightX = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneRightStickX", 0) * 0.01f;
+	SecondaryGamepad.Sticks.DeadZoneRightY = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneRightStickY", 0) * 0.01f;
+	SecondaryGamepad.Triggers.DeadZoneLeft = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneLeftTrigger", 0) * 0.01f;
+
+	SecondaryGamepad.Sticks.InvertLeftX = IniFile.ReadBoolean("SecondaryGamepad", "InvertLeftStickX", false);	//@041 +@042 + fix, в config были invert, тут нет
+	SecondaryGamepad.Sticks.InvertLeftY = IniFile.ReadBoolean("SecondaryGamepad", "InvertLeftStickY", false);
+	SecondaryGamepad.Sticks.InvertRightX = IniFile.ReadBoolean("SecondaryGamepad", "InvertRightStickX", false);
+	SecondaryGamepad.Sticks.InvertRightY = IniFile.ReadBoolean("SecondaryGamepad", "InvertRightStickY", false);
+	SecondaryGamepad.Sticks.InvertLeftXY = IniFile.ReadBoolean("SecondaryGamepad", "InvertLeftStickXY", false);
+	SecondaryGamepad.Sticks.InvertRightXY = IniFile.ReadBoolean("SecondaryGamepad", "InvertRightStickXY", false);
+
+	SecondaryGamepad.Triggers.DeadZoneRight = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneRightTrigger", 0);
+	SecondaryGamepad.DefaultLEDBrightness = std::clamp((int)(255 - IniFile.ReadInteger("SecondaryGamepad", "DefaultBrightness", 100) * 2.55), 0, 255);
+	SecondaryGamepad.OutState.LEDBrightness = SecondaryGamepad.DefaultLEDBrightness;
+	SecondaryGamepad.DefaultModeColor = WebColorToRGB(IniFile.ReadString("SecondaryGamepad", "DefaultModeColor", "00ff00"));
+	SecondaryGamepad.OutState.LEDColor = SecondaryGamepad.DefaultModeColor;
+
+	// External pedals
+	AppStatus.ExternalPedalsMode = IniFile.ReadInteger("ExternalPedals", "DefaultMode", 0);
+	AppStatus.ExternalPedalsXboxModePedal1 = SonyNintendoKeyNameToJoyShockKeyCode(IniFile.ReadString("ExternalPedals", "AimingPedal1", "NONE"));
+	AppStatus.ExternalPedalsXboxModePedal1Analog = (AppStatus.ExternalPedalsXboxModePedal1 == JSMASK_ZL) || (AppStatus.ExternalPedalsXboxModePedal1 == JSMASK_ZR);
+	AppStatus.ExternalPedalsXboxModePedal2 = SonyNintendoKeyNameToJoyShockKeyCode(IniFile.ReadString("ExternalPedals", "AimingPedal2", "NONE"));
+	AppStatus.ExternalPedalsXboxModePedal2Analog = (AppStatus.ExternalPedalsXboxModePedal2 == JSMASK_ZL) || (AppStatus.ExternalPedalsXboxModePedal2 == JSMASK_ZR);
+	AppStatus.ExternalPedalsValuePress = 65536 * ClampFloat(IniFile.ReadFloat("ExternalPedals", "PedalValuePress", 20.0f) * 0.01f, 0, 1.0f);
+	for (int i = 0; i < 16; ++i) AppStatus.ExternalPedalsButtons[i] = SonyNintendoKeyNameToJoyShockKeyCode(IniFile.ReadString("ExternalPedals", "Button" + std::to_string(i + 1), "NONE"));
+	AppStatus.ExternalPedalsJoyInfo.dwFlags = JOY_RETURNALL;
+	AppStatus.ExternalPedalsJoyInfo.dwSize = sizeof(AppStatus.ExternalPedalsJoyInfo);
+	//в блок чтения настроек педалей:
+	std::string p1AxisName = IniFile.ReadString("ExternalPedals", "Pedal1Axis", "V");
+	std::string p2AxisName = IniFile.ReadString("ExternalPedals", "Pedal2Axis", "U");
+	AppStatus.Pedal1Axis = ParseAxisName(p1AxisName);	//@034
+	AppStatus.Pedal2Axis = ParseAxisName(p2AxisName);
+	// Читаем имя устройства (если не задано, по умолчанию будет "AUTO")
+	AppStatus.ExternalPedalsDeviceName = IniFile.ReadString("ExternalPedals", "DeviceName", "AUTO");	//@034
 }
 
 void LoadXboxProfile(std::string ProfileFile) {
@@ -1176,6 +1197,8 @@ void LoadXboxProfile(std::string ProfileFile) {
 	CurrentXboxProfile.LeftStick = ReadXboxKey("L3", "L3", "LS", "LS");
 	CurrentXboxProfile.RightStick = ReadXboxKey("R3", "R3", "RS", "RS");
 
+	AppStatus.AimingButtonName = IniFile.ReadString("SETTINGS", "AimingButton", "NONE");
+	AppStatus.AimingButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.AimingButtonName);
 	AppStatus.AimMode = IniFile.ReadBoolean("SETTINGS", "AimingMode", AimMouseMode);
 	//AppStatus.AimingByPressingMode = IniFile.ReadBoolean("SETTINGS", "AimingByPressingMode", true);
 	bool newAimingByPressing = IniFile.ReadBoolean("SETTINGS", "AimingByPressingMode", true);
@@ -1411,8 +1434,8 @@ void DefaultMainText() {
 		" For setup primary setting use Config.exe. To manage all settings see config.ini and XboxProfile\\*.ini\n").c_str());
 		
 		u8printf(T("Layer1_Info", "\n \033[4mGyro info\033[0m: ").c_str());
-		//u8printf(T("Layer1_Calibrate", "\n Auto-calibration: place the device on a flat surface, wait for the rumble or press \"\033[1m%s\033[0m\" to calibrate manually\n").c_str(), AppStatus.HotKeys.CalibrateKeyName.c_str());
-		u8printf(T("Layer1_Calibrate", "\n Auto-calibration: place the device on a flat surface and wait for the rumble\n").c_str());
+		u8printf(T("Layer1_Calibrate", "\n Auto-calibration: place the device on a flat surface, wait for the beep, or press \"\033[1m%s\033[0m\" to do it manually\n").c_str(), AppStatus.HotKeys.CalibrateKeyName.c_str());
+		//u8printf(T("Layer1_Calibrate", "\n Auto-calibration: place the device on a flat surface and wait for the beep\n").c_str());
 		u8printf(T("Layer1_Sense", "\n Press \"\033[1mCapture + X/B\033[0m\" or \"\033[1mPS + \xE2\x96\xB3/x\033[0m\" to change aiming sensitivity, \"PS/Capture + RS\" to reset\n").c_str());
 		u8printf(T("Layer1_Gyro_On", "\n Press \"\033[1m%s\033[0m\" or \"\033[1mALT + 2\033[0m\" to unlock Gyro Motion (on/off)\n").c_str(), AppStatus.AimingToggleButtonName.c_str());
 
@@ -1430,7 +1453,7 @@ void DefaultMainText() {
 		u8printf(T("Layer1_Misc", "\n \033[4mMiscellaneous\033[0m:").c_str());
 		u8printf(T("Layer1_Profile", "\n Profile: \"\033[1m%s\033[0m\", press \"\033[1mPS/Home + DPAD Up/Down\033[0m\" or \"\033[1mALT + Up/Down\033[0m\" to change\n").c_str(), XboxProfiles[XboxProfileIndex].substr(0, XboxProfiles[XboxProfileIndex].size() - 4).c_str());
 		u8printf(T("Layer1_StickAsTrigger", "\n Press \"\033[1m%s\033[0m\" or \"\033[1mALT + D\033[0m\" - Right Stick as Analog Triggers mode (on/off)\n").c_str(), AppStatus.StickAsTriggerToggleButtonName.c_str());
-		u8printf(T("Layer1_Battery", "\n Press \"\033[1mALT + I\033[0m\" to view battery status, \"\033[1mALT + Z\033[0m\" to see other hotkeys").c_str());
+		u8printf(T("Layer1_Battery", "\n Press \"\033[1mALT + I\033[0m\" to view battery status, \"\033[1mALT + Z\033[0m\" to see other hotkeys, \"\033[1mALT + Esc\033[0m\" to Exit\n").c_str());
 		//u8printf(T("Layer1_Full_Menu", "\n Press \"\033[1mALT + Z\033[0m\" to open full menu\n").c_str());
 		//u8printf(T("Layer1_Exit", "\n Press \"\033[1mALT + Esc\033[0m\" to Exit\n").c_str());
 
@@ -1451,7 +1474,7 @@ void DefaultMainText() {
 	u8printf(T("Layer3_AImMode", "  Gyro Behavior:   Press \"ALT + F\" to switching Control button behavior (start/stop motion).\n").c_str());
 	u8printf(T("Layer3_Lstick", "  L-Stick Mode:    Press \"PS/HOME + L3\" or \"ALT + S\" to toggle Left Stick mode (AutoSprintButton).\n").c_str());
 	u8printf(T("Layer3_Rumble", "  Rumble Power:    Press \"Capture + Plus\" or \"PS + Options\" or \"ALT + </>\" to adjust rumble.\n").c_str());
-	u8printf(T("Layer3_Calibrate", "  Calibrate:	   Press \"ALT + C\" or \"%s\" to calibrate gyroscope manually\n").c_str(), AppStatus.HotKeys.CalibrateKeyName.c_str());
+	u8printf(T("Layer3_Calibrate", "  Calibrate:	   Press \"ALT + C\" or \"%s\" to calibrate gyroscope manually.\n").c_str(), AppStatus.HotKeys.CalibrateKeyName.c_str());
 	u8printf(T("Layer3_Backlight", "  Backlight:       Press \"PS + L1\" or \"ALT + B\" to toggle controller backlight (Sony only).\n").c_str());
 	u8printf(T("Layer3_Deadzones", "  Diagnostics:     Press \"ALT + F9\" to view stick and trigger dead zones.\n").c_str());
 
@@ -1487,17 +1510,6 @@ void SwapGamepads()
 	GamepadSetState(SecondaryGamepad);
 	MainTextUpdate();
 }
-
-/*void SyncGamepadsWithJSL()
-{
-	struct JSL_SETTINGS JSLSecondaryGamepadInfo = JslGetControllerInfoAndSettings(PrimaryGamepad.DeviceIndex);
-	//printf_s("1. %s\n2. %s \n", JSLSecondaryGamepadInfo.controllerPath.c_str(), PrimaryGamepad.DevicePath);
-	if (!PrimaryGamepad.DevicePath.empty() && PrimaryGamepad.DevicePath != JSLSecondaryGamepadInfo.controllerPath.c_str()) {
-		//printf("swaped\n");
-		std::swap(PrimaryGamepad.DeviceIndex, SecondaryGamepad.DeviceIndex);
-		std::swap(PrimaryGamepad.DeviceIndex2, SecondaryGamepad.DeviceIndex2);
-	}
-}*/
 
 void OpenGamepadByJSL(AdvancedGamepad &Gamepad) {	//@021 RumbleFix3 -возможное устранение "вибрации не на том Joycon"
 	if (Gamepad.DeviceIndex == -1) return;			//брать точный системный путь устройства из библиотеки JoyShockLibrary
@@ -1613,7 +1625,8 @@ void RefreshDevices() {
 		}
 
 		// Только для прошедших проверку (реальных) устройств настраиваем гироскоп и калибровку
-		JslSetAutomaticCalibration(handle, true);
+		//JslSetAutomaticCalibration(handle, true);
+		JslSetAutomaticCalibration(handle, AppStatus.AutoCalibrationEnabled); //@050 -  нет сартовой автокалибровки при "0"
 		JslSetGyroSpace(handle, AppStatus.GyroSpace);	//@032 После bugfix в joyshocklib при "1" оси больше не меняются при скручивании кисти (до 90 градусов)
 
 		// Распределяем по слотам
@@ -1640,7 +1653,7 @@ void RefreshDevices() {
 			if (PrimaryGamepad.DeviceIndex == -1) PrimaryGamepad.DeviceIndex = handle;
 			else if (SecondaryGamepad.DeviceIndex == -1) SecondaryGamepad.DeviceIndex = handle;
 		}
-		// Обычный режим (склеивание Joy-Con в один геймпад)
+		// Обычный режим (merge)
 		else {
 			if (JoyconLeftFound) {
 				if (JslGetControllerType(PrimaryGamepad.DeviceIndex) == JS_TYPE_JOYCON_LEFT) PrimaryGamepad.DeviceIndex2 = handle;
@@ -1682,7 +1695,8 @@ void RefreshDevices() {
 	SecondaryGamepad.Motion.PitchAngleInitialized = false;
 	SecondaryGamepad.Motion.IsManualCalibrated = false;
 
-	AppStatus.StartupCalibrationFrozen = false;	//@050
+	//AppStatus.StartupCalibrationFrozen = false;	//@050
+	AppStatus.StartupCalibrationFrozen = !AppStatus.AutoCalibrationEnabled;	//@050 -  нет сартовой автокалибровки при "0"
 	AppStatus.BTReset = false;
 	MainTextUpdate();
 }
@@ -1697,7 +1711,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			if (!PrimaryGamepad.USBConnection || !SecondaryGamepad.USBConnection) {
 				AppStatus.BTReset = true; // Bug with Bluetooth controllers, in which in Input Bluetooth controllers random values (JoyShockLibarary?). Resetting again helps.
 			}*/
-			AppStatus.DeviceChangeDebounce = 120;	//@022 ConnectFix таймер (120 тиков x Sleeptimeout) на обновление
+			AppStatus.DeviceChangeDebounce = 1000 / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);	//@022 ConnectFix таймер ровно на 1 секунду (1000 мс) независимо от SleepTimeOut
 		}
 		break;
 		/*case WM_CLOSE:
@@ -1725,7 +1739,7 @@ uint64_t GetFileModifiedTime(const std::string& filePath) {
 
 int main(int argc, char **argv)
 {
-	SetConsoleTitle("JCAdvance 3.0");
+	SetConsoleTitle("JCAdvance 3.4");
 	WindowToCenter();
 
 	bool ForceEnLang = false;
@@ -1756,69 +1770,20 @@ int main(int argc, char **argv)
 		AppStatus.LangFile = "english";
 	}
 
-	PrimaryGamepad.Sticks.InvertLeftXY = IniFile.ReadBoolean("Gamepad", "InvertLeftStickXY", false);	//@041
-	PrimaryGamepad.Sticks.InvertRightXY = IniFile.ReadBoolean("Gamepad", "InvertRightStickXY", false);
-	AppStatus.HotKeys.ResetKeyName = IniFile.ReadString("Gamepad", "ResetKey", "NONE");
-	AppStatus.HotKeys.ResetKey = KeyNameToKeyCode(AppStatus.HotKeys.ResetKeyName);
-	AppStatus.AutoCalibrationEnabled = IniFile.ReadBoolean("Motion", "AutoCalibrationEnabled", true);	//@050
-	AppStatus.HotKeys.CalibrateKeyName = IniFile.ReadString("Gamepad", "CalibrateKey", "NONE");
-	AppStatus.HotKeys.CalibrateKey = KeyNameToKeyCode(AppStatus.HotKeys.CalibrateKeyName);
-	AppStatus.LedCalibrationDebug = IniFile.ReadBoolean("Motion", "LedCalibrationDebug", false);		//056
+	//AppStatus.HotKeys.ResetKeyName = IniFile.ReadString("Gamepad", "ResetKey", "NONE");
+	//AppStatus.HotKeys.ResetKey = KeyNameToKeyCode(AppStatus.HotKeys.ResetKeyName);
+	//AppStatus.HotKeys.OSDKey = KeyNameToKeyCode(IniFile.ReadString("Gamepad", "OSDKey", "NONE"));		//@060
+	//AppStatus.AutoCalibrationEnabled = IniFile.ReadBoolean("Motion", "AutoCalibrationEnabled", true);	//@050
+	//AppStatus.HotKeys.CalibrateKeyName = IniFile.ReadString("Gamepad", "CalibrateKey", "NONE");
+	//AppStatus.HotKeys.CalibrateKey = KeyNameToKeyCode(AppStatus.HotKeys.CalibrateKeyName);
 	AppStatus.ShowBatteryStatusOnLightBar = IniFile.ReadBoolean("Gamepad", "ShowBatteryStatusOnLightBar", true);
-	AppStatus.SleepTimeOut = IniFile.ReadInteger("Gamepad", "SleepTimeOut", 15);
+	AppStatus.SleepTimeOut = IniFile.ReadInteger("SETTINGS", "SleepTimeOut", 15);
 	timeBeginPeriod(1);
 	AppStatus.SkipPollTimeOut = SkipPollTimeOutMS / AppStatus.SleepTimeOut;
 	AppStatus.PSReleasedTimeOut = PSReleasedTimeOutMS / AppStatus.SleepTimeOut;
 	AppStatus.ButtonCheckTimeOut = ButtonReleasedTimeOutMS / AppStatus.SleepTimeOut;
-
 	AppStatus.FrameTime = AppStatus.SleepTimeOut / 1000.0f;
-
-	PrimaryGamepad.TouchSticksOn = IniFile.ReadBoolean("Gamepad", "TouchSticksOn", false);
-	PrimaryGamepad.TouchSticks.LeftX = IniFile.ReadFloat("Gamepad", "TouchLeftStickSensX", 5.0f);
-	PrimaryGamepad.TouchSticks.LeftY = IniFile.ReadFloat("Gamepad", "TouchLeftStickSensY", 5.0f);
-	PrimaryGamepad.TouchSticks.RightX = IniFile.ReadFloat("Gamepad", "TouchRightStickSensX", 1.0f);
-	PrimaryGamepad.TouchSticks.RightY = IniFile.ReadFloat("Gamepad", "TouchRightStickSensY", 1.0f);
-
-	PrimaryGamepad.DefaultLEDBrightness = std::clamp((int)(255 - IniFile.ReadInteger("Gamepad", "DefaultBrightness", 100) * 2.55), 0, 255);
-	PrimaryGamepad.OutState.LEDBrightness = PrimaryGamepad.DefaultLEDBrightness;
-	PrimaryGamepad.RumbleStrength = IniFile.ReadInteger("Gamepad", "RumbleStrength", 100);
-	AppStatus.LockedChangeBrightness = IniFile.ReadBoolean("Gamepad", "LockChangeBrightness", false);
-	AppStatus.ChangeModesWithClick = IniFile.ReadBoolean("Gamepad", "ChangeModesWithClick", true);
-	AppStatus.ChangeModesWithoutAreas = IniFile.ReadBoolean("Gamepad", "ChangeModesWithoutAreas", false);
-	AppStatus.JoyconChangeModesWithButton = SonyNintendoKeyNameToJoyShockKeyCode(IniFile.ReadString("Gamepad", "JoyconChangeModesWithButton", "NONE"));
-
-	AppStatus.AimingButton = SonyNintendoKeyNameToJoyShockKeyCode(IniFile.ReadString("Motion", "AimingButton", "L2"));
-	AppStatus.JoyconRumbleMerge = IniFile.ReadBoolean("Gamepad", "JoyconRumbleMerge", false);
-	AppStatus.GyroFromLeft = IniFile.ReadBoolean("Motion", "GyroFromLeft", false);		//@024 Gyro левша
 	AppStatus.GyroSpace = IniFile.ReadInteger("Motion", "GyroSpace", 1);	//@032
-	AppStatus.MeleeGForce = IniFile.ReadFloat("Motion", "MeleeGForce", 3.0f); //@043
-	AppStatus.SplitJoycons = IniFile.ReadBoolean("Gamepad", "SplitJoycons", false);	//@040 Joy-con split Mode
-
-	//@005 Двухкнопочный Binding для переключения режимов + чтение из Config, юзается новый парсинг в .h + условия активации toggle-функций в main (buttons & mask) == mask. )
-	AppStatus.AimingByPressingMode = IniFile.ReadBoolean("Motion", "AimingByPressingMode", true);
-	AppStatus.AimingButtonName = IniFile.ReadString("Motion", "AimingButton", "NONE");
-	AppStatus.AimingButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.AimingButtonName);
-	AppStatus.AimingToggleButtonName = IniFile.ReadString("Motion", "AimingToggleButton", "NONE");
-	AppStatus.AimingToggleButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.AimingToggleButtonName);
-	AppStatus.AimingModeToggleButtonName = (IniFile.ReadString("Motion", "AimingModeToggleButton", "NONE"));
-	AppStatus.AimingModeToggleButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.AimingModeToggleButtonName);
-	AppStatus.DrivingToggleButtonName = IniFile.ReadString("Motion", "DrivingToggleButton", "NONE");
-	AppStatus.DrivingToggleButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.DrivingToggleButtonName);	//@045
-	AppStatus.DrivingCalibrationButtonName = IniFile.ReadString("Motion", "DrivingCalibrationButton", "NONE");
-	AppStatus.DrivingCalibrationButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.DrivingCalibrationButtonName);
-	AppStatus.StickAsTriggerToggleButtonName = IniFile.ReadString("Motion", "StickAsTriggerToggleButton", "NONE");
-	AppStatus.StickAsTriggerToggleButton = SonyNintendoKeyNameToJoyShockKeyCode(AppStatus.StickAsTriggerToggleButtonName);	//@047
-
-	PrimaryGamepad.Motion.AircraftEnabled = IniFile.ReadBoolean("Motion", "AircraftEnabled", false);
-	PrimaryGamepad.Motion.AircraftPitchAngle = IniFile.ReadFloat("Motion", "AircraftPitchAngle", 45) / 2.0f;
-	PrimaryGamepad.Motion.AircraftPitchInverted = IniFile.ReadBoolean("Motion", "AircraftPitchInverted", false) ? -1 : 1;
-	PrimaryGamepad.Motion.AircraftRollSens = IniFile.ReadFloat("Motion", "AircraftRollSens", 100) * 0.11875f;
-
-	PrimaryGamepad.Motion.MotionWheelButtonsDeadZone = IniFile.ReadFloat("Motion", "MotionWheelButtonsDeadZone", 12.0f);
-	PrimaryGamepad.Motion.MouseSmooth = ClampFloat(IniFile.ReadFloat("Motion", "MouseSmooth", 0), 0, 99) * 0.01f; //@029 EMA Filter
-	PrimaryGamepad.Motion.JoySmooth = ClampFloat(IniFile.ReadFloat("Motion", "JoySmooth", 0), 0, 99) * 0.01f;
-	PrimaryGamepad.Motion.Tightening = IniFile.ReadFloat("Motion", "Tightening", 2.0f); //@030
-	//PrimaryGamepad.Motion.LinearityWheel = IniFile.ReadFloat("Motion", "LinearityWheel", 50.0f);
 
 	PrimaryGamepad.DefaultModeColor = WebColorToRGB(IniFile.ReadString("Gamepad", "DefaultModeColor", "0000ff"));
 	PrimaryGamepad.OutState.LEDColor = PrimaryGamepad.DefaultModeColor;
@@ -1845,50 +1810,12 @@ int main(int argc, char **argv)
 		AppStatus.SecondaryGamepadEnabled = true;
 	}
 
-	SecondaryGamepad.Sticks.DeadZoneLeftX = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneLeftStickX", 0) * 0.01f;	//@010
-	SecondaryGamepad.Sticks.DeadZoneLeftX = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneLeftStickX", 0) * 0.01f;
-	SecondaryGamepad.Sticks.DeadZoneLeftX = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneLeftStickX", 0) * 0.01f;
-	SecondaryGamepad.Sticks.DeadZoneLeftY = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneLeftStickY", 0) * 0.01f;
-	SecondaryGamepad.Sticks.DeadZoneRightX = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneRightStickX", 0) * 0.01f;
-	SecondaryGamepad.Sticks.DeadZoneRightY = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneRightStickY", 0) * 0.01f;
-	SecondaryGamepad.Triggers.DeadZoneLeft = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneLeftTrigger", 0) * 0.01f;
-
-	SecondaryGamepad.Sticks.InvertLeftX = IniFile.ReadBoolean("SecondaryGamepad", "InvertLeftStickX", false);	//@041 +@042 + fix, в config были invert, тут нет
-	SecondaryGamepad.Sticks.InvertLeftY = IniFile.ReadBoolean("SecondaryGamepad", "InvertLeftStickY", false);
-	SecondaryGamepad.Sticks.InvertRightX = IniFile.ReadBoolean("SecondaryGamepad", "InvertRightStickX", false);
-	SecondaryGamepad.Sticks.InvertRightY = IniFile.ReadBoolean("SecondaryGamepad", "InvertRightStickY", false);
-	SecondaryGamepad.Sticks.InvertLeftXY = IniFile.ReadBoolean("SecondaryGamepad", "InvertLeftStickXY", false);
-	SecondaryGamepad.Sticks.InvertRightXY = IniFile.ReadBoolean("SecondaryGamepad", "InvertRightStickXY", false);
-
-	SecondaryGamepad.Triggers.DeadZoneRight = IniFile.ReadFloat("SecondaryGamepad", "DeadZoneRightTrigger", 0);
-	SecondaryGamepad.DefaultLEDBrightness = std::clamp((int)(255 - IniFile.ReadInteger("SecondaryGamepad", "DefaultBrightness", 100) * 2.55), 0, 255);
-	SecondaryGamepad.OutState.LEDBrightness = SecondaryGamepad.DefaultLEDBrightness;
-	SecondaryGamepad.DefaultModeColor = WebColorToRGB(IniFile.ReadString("SecondaryGamepad", "DefaultModeColor", "00ff00"));
-	SecondaryGamepad.OutState.LEDColor = SecondaryGamepad.DefaultModeColor;
-
-	// External pedals
-	AppStatus.ExternalPedalsDInputSearch = IniFile.ReadBoolean("ExternalPedals", "DInput", false);
-	AppStatus.ExternalPedalsCOMPort = IniFile.ReadInteger("ExternalPedals", "COMPort", 0);
-	AppStatus.ExternalPedalsMode = IniFile.ReadInteger("ExternalPedals", "DefaultMode", 0);
-	AppStatus.ExternalPedalsXboxModePedal1 = SonyNintendoKeyNameToJoyShockKeyCode(IniFile.ReadString("ExternalPedals", "AimingPedal1", "NONE"));
-	AppStatus.ExternalPedalsXboxModePedal1Analog = (AppStatus.ExternalPedalsXboxModePedal1 == JSMASK_ZL) || (AppStatus.ExternalPedalsXboxModePedal1 == JSMASK_ZR);
-	AppStatus.ExternalPedalsXboxModePedal2 = SonyNintendoKeyNameToJoyShockKeyCode(IniFile.ReadString("ExternalPedals", "AimingPedal2", "NONE"));
-	AppStatus.ExternalPedalsXboxModePedal2Analog = (AppStatus.ExternalPedalsXboxModePedal2 == JSMASK_ZL) || (AppStatus.ExternalPedalsXboxModePedal2 == JSMASK_ZR);
-	AppStatus.ExternalPedalsValuePress = 65536 * ClampFloat(IniFile.ReadFloat("ExternalPedals", "PedalValuePress", 20.0f) * 0.01f, 0, 1.0f);
-	for (int i = 0; i < 16; ++i) AppStatus.ExternalPedalsButtons[i] = SonyNintendoKeyNameToJoyShockKeyCode(IniFile.ReadString("ExternalPedals", "Button" + std::to_string(i + 1), "NONE"));
-	AppStatus.ExternalPedalsJoyInfo.dwFlags = JOY_RETURNALL;
-	AppStatus.ExternalPedalsJoyInfo.dwSize = sizeof(AppStatus.ExternalPedalsJoyInfo);
-	//в блок чтения настроек педалей:
-	std::string p1AxisName = IniFile.ReadString("ExternalPedals", "Pedal1Axis", "V");
-	std::string p2AxisName = IniFile.ReadString("ExternalPedals", "Pedal2Axis", "U");
-	AppStatus.Pedal1Axis = ParseAxisName(p1AxisName);	//@034
-	AppStatus.Pedal2Axis = ParseAxisName(p2AxisName);
-	// Читаем имя устройства (если не задано, по умолчанию будет "AUTO")
-	AppStatus.ExternalPedalsDeviceName = IniFile.ReadString("ExternalPedals", "DeviceName", "AUTO");	//@034
-
 	//@044 Считываем тип эмулируемого геймпада (Xbox или DS4)
 	std::string controllerType = IniFile.ReadString("Gamepad", "EmulatedController", "Xbox");
 	AppStatus.EmulateDS4 = (controllerType == "DS4" || controllerType == "ds4");
+
+	AppStatus.ExternalPedalsDInputSearch = IniFile.ReadBoolean("ExternalPedals", "DInput", false);
+	AppStatus.ExternalPedalsCOMPort = IniFile.ReadInteger("ExternalPedals", "COMPort", 0);
 
 	if (AppStatus.ExternalPedalsDInputSearch) { // Dinput in priority
 		//ExternalPedalsDInputSearch();			//	//@034 - нахера 3й раз [Pedals Search] Scanning DirectInput devices ?
@@ -2044,6 +1971,11 @@ int main(int argc, char **argv)
 	uint64_t LastProfileTime = GetFileModifiedTime(CurrentProfilePath);
 	int HotReloadTimer = 10000 / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);	// Таймер, чтобы не дергать Windows слишком часто (10 сек.)
 
+	//@060 Shared Memory для передачи телеметрии гироскопа в OSD (AHK)
+	HANDLE hMapFile = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, 256, "JCAdvanceTelemetry");
+	float* pTelemetry = nullptr;
+	if (hMapFile) pTelemetry = (float*)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, 256);
+
 	while (!(GetAsyncKeyState(VK_LMENU) & 0x8000 && GetAsyncKeyState(VK_ESCAPE) & 0x8000))
 	{
 		if (PeekMessage(&WindowMsgs, NULL, 0, 0, PM_REMOVE)) {
@@ -2060,35 +1992,37 @@ int main(int argc, char **argv)
 		}
 
 		// Reset
-		if ((AppStatus.SkipPollCount == 0 && (IsKeyPressed(VK_CONTROL) && IsKeyPressed('R')) || IsKeyPressed(AppStatus.HotKeys.ResetKey)) || AppStatus.BTReset) 
+		//if ((AppStatus.SkipPollCount == 0 && (IsKeyPressed(VK_CONTROL) && IsKeyPressed('R')) || IsKeyPressed(AppStatus.HotKeys.ResetKey)) || AppStatus.BTReset) //@061 fix critical bug when Resetkey=NONE
+		if (AppStatus.BTReset || (AppStatus.SkipPollCount == 0 && ((IsKeyPressed(VK_CONTROL) && IsKeyPressed('R')) || (AppStatus.HotKeys.ResetKey != 0 && IsKeyPressed(AppStatus.HotKeys.ResetKey)))))
   		{
 			RefreshDevices();
 			AppStatus.SkipPollCount = AppStatus.SkipPollTimeOut;
 		}
 
-		//@059 ФОНОВЫЙ БЕСШОВНЫЙ СБРОС MinDeltaGyro (Каждые 10 минут)
-		if (AppStatus.SeamlessResetTimer > 0) {
+		//@059 ФОНОВЫЙ БЕСШОВНЫЙ СБРОС MinDeltaGyro (Каждые 10 минут) - возможный фикс отказа автокалибровки при длинных сессиях
+		/*if (AppStatus.SeamlessResetTimer > 0) {
 			AppStatus.SeamlessResetTimer--;
 		}
 		else {
 			// Перезаводим таймер на 10 минут (600 000 мс)
-			AppStatus.SeamlessResetTimer = 600000 / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);
+			AppStatus.SeamlessResetTimer = 300000 / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);
 
-			SeamlessGyroReset(PrimaryGamepad.DeviceIndex);
-			if (PrimaryGamepad.DeviceIndex2 != -1) {
-				SeamlessGyroReset(PrimaryGamepad.DeviceIndex2);
+			// Делаем сброс ТОЛЬКО если включена фоновая калибровка
+			if (AppStatus.AutoCalibrationEnabled) {
+				SeamlessGyroReset(PrimaryGamepad.DeviceIndex);
+				if (PrimaryGamepad.DeviceIndex2 != -1) {
+					SeamlessGyroReset(PrimaryGamepad.DeviceIndex2);
+				}
+
+				if (AppStatus.SecondaryGamepadEnabled && SecondaryGamepad.DeviceIndex != -1) {
+					SeamlessGyroReset(SecondaryGamepad.DeviceIndex);
+					if (SecondaryGamepad.DeviceIndex2 != -1) SeamlessGyroReset(SecondaryGamepad.DeviceIndex2);
+				}
 			}
-
-			// Если включен второй геймпад, сбрасываем и его
-			if (AppStatus.SecondaryGamepadEnabled && SecondaryGamepad.DeviceIndex != -1) {
-				SeamlessGyroReset(SecondaryGamepad.DeviceIndex);
-				if (SecondaryGamepad.DeviceIndex2 != -1) SeamlessGyroReset(SecondaryGamepad.DeviceIndex2);
-			}
-
-			// временный Debug
-			 //Beep(800, 50); 
+			//Debug
+			Beep(800, 50); 
 			//PlaySound(ChangeEmuModeWav, NULL, SND_ASYNC);
-		}
+		}*/
 
 		//@057 HotRead ini and apply
 		if (HotReloadTimer > 0) {
@@ -2117,12 +2051,13 @@ int main(int argc, char **argv)
 				// Запоминаем старые значения режимов ПЕРЕД загрузкой
 				bool oldAimMode = AppStatus.AimMode;
 				bool oldAimingByPressingMode = AppStatus.AimingByPressingMode;
+				unsigned int oldAimingButton = AppStatus.AimingButton;
 
 				// Загружаем профиль (новые значения применяются здесь)
 				LoadXboxProfile(XboxProfiles[XboxProfileIndex]);
 
 				// Проверяем, изменились ли режимы, которые выводятся в шапку консоли
-				if (oldAimMode != AppStatus.AimMode || oldAimingByPressingMode != AppStatus.AimingByPressingMode) {
+				if (oldAimMode != AppStatus.AimMode || oldAimingByPressingMode != AppStatus.AimingByPressingMode || oldAimingButton != AppStatus.AimingButton) {
 					// Очищаем и перерисовываем консоль ТОЛЬКО если режим реально переключился
 					MainTextUpdate();
 				}
@@ -2280,7 +2215,7 @@ int main(int argc, char **argv)
 			}
 		}
 
-		//@050 Калибровка автоматическая, ручная + систмеа индикации удачной/неудачной калибровки 
+		//@050 Калибровка автоматическая с отключением
 		int aimingHandle = PrimaryGamepad.DeviceIndex;
 		if (PrimaryGamepad.DeviceIndex2 != -1 && !AppStatus.GyroFromLeft) {
 			aimingHandle = PrimaryGamepad.DeviceIndex2;
@@ -2289,7 +2224,7 @@ int main(int argc, char **argv)
 		if (aimingHandle != -1) {
 			static bool wasSteadyAndConfident = false;
 			JSL_AUTO_CALIBRATION autoCal = JslGetAutoCalibrationStatus(aimingHandle);
-			bool isSteadyAndConfident = (autoCal.isSteady && autoCal.confidence >= 1.0f);
+			bool isSteadyAndConfident = (autoCal.isSteady && autoCal.confidence > 0.99f);
 
 			if (isSteadyAndConfident && !wasSteadyAndConfident) {
 
@@ -2300,20 +2235,20 @@ int main(int argc, char **argv)
 						JslSetAutomaticCalibration(aimingHandle, false);
 					}
 					AppStatus.StartupCalibrationFrozen = true; // Стартовый этап пройден
-					PlaySound(ChangeEmuModeWav, NULL, SND_ASYNC);
+					PlaySound(ChangeEmuModeWav, NULL, SND_ASYNC);	//success beep
 				}
 
 				// 2. Обработка ФОНОВЫХ калибровок
 				else if (AppStatus.AutoCalibrationEnabled) {
 					// Просто отодвигаем СБРОС MinDeltaGyro на 10 минут
-					AppStatus.SeamlessResetTimer = 600000 / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);
-					PlaySound(ChangeEmuModeWav, NULL, SND_ASYNC);	//debug фоновой калибровки
+					//AppStatus.SeamlessResetTimer = 3000 / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);
+					if (AppStatus.BackgroundCalibSound) PlaySound(ChangeEmuModeWav, NULL, SND_ASYNC);
 				}
 			}
 			wasSteadyAndConfident = isSteadyAndConfident;
 		}
 
-		//3. Ручная калибровка по hokey c индикацией успеха и ошибки
+		//Ручная калибровка по hokey c индикацией (успеха и ошибки)
 		if (AppStatus.SkipPollCount == 0 && (
 			(AppStatus.HotKeys.CalibrateKey != 0 && IsKeyPressed(AppStatus.HotKeys.CalibrateKey))
 			|| (IsKeyPressed(VK_MENU) && IsKeyPressed('C')) // Дублирующий хардкод хоткея ALT + C
@@ -2370,9 +2305,16 @@ int main(int argc, char **argv)
 
 				if (isSuccess) {
 					// Сигнал УСПЕХА (двойной высокий писк). Теперь он совпадет со светодиодами!
-					Beep(1200, 50); Sleep(50); Beep(1200, 100);
-					AppStatus.SeamlessResetTimer = 600000 / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);	//сброс таймера
-					//AppStatus.CalibRumbleTimer = 200 / AppStatus.SleepTimeOut; //будет двойной вибро, но вибро для калибровки не очень хорошо
+					//Beep(1500, 50); Sleep(50); Beep(1200, 100);
+					// Асинхронный сигнал УСПЕХА (без блокировки главного потока ViGEm)
+					std::thread([]() {
+						Beep(1500, 50);
+						Sleep(50);
+						Beep(1200, 100);
+					}).detach();
+					
+					//AppStatus.SeamlessResetTimer = 600000 / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);	// Потодвигаем СБРОС MinDeltaGyro на 10 минут
+					//AppStatus.CalibRumbleTimer = 200 / AppStatus.SleepTimeOut; //будет двойной вибро, но вибро для калибровки такое себе
 				}
 				else {
 					// Сигнал ПРОВАЛА (низкий гудок). Геймпад трясли в руках все 5 секунд.
@@ -2381,7 +2323,7 @@ int main(int argc, char **argv)
 			}
 		}
 
-		//4. Вибро-помощник
+		//Вибро-помощник
 		/*if (AppStatus.CalibRumbleTimer > 0) {
 			AppStatus.CalibRumbleTimer--;
 
@@ -2472,6 +2414,18 @@ int main(int argc, char **argv)
 			MainTextUpdate();
 			AppStatus.SkipPollCount = AppStatus.SkipPollTimeOut;
 		}
+		
+		//@060 Запуск и остановка OSD.exe по хоткею
+		if (AppStatus.SkipPollCount == 0 && AppStatus.HotKeys.OSDKey != 0 && IsKeyPressed(AppStatus.HotKeys.OSDKey)) {
+			AppStatus.IsOsdActive = !AppStatus.IsOsdActive;
+			if (AppStatus.IsOsdActive) {
+				ShellExecuteA(NULL, "open", "OSD.exe", NULL, NULL, SW_SHOWNORMAL);
+			}
+			else {
+				system("taskkill /IM OSD.exe /F > nul 2>&1");
+			}
+			AppStatus.SkipPollCount = AppStatus.SkipPollTimeOut;
+		}
 
 		// Switch screenshot mode
 		if (AppStatus.SkipPollCount == 0 && IsKeyPressed(VK_MENU) && IsKeyPressed('X'))
@@ -2498,7 +2452,7 @@ int main(int argc, char **argv)
 			AppStatus.SkipPollCount = AppStatus.SkipPollTimeOut;
 		}
 
-		// Switch keyboard and mouse profile
+		// Switch profile
 		if (AppStatus.SkipPollCount == 0 && (AppStatus.GamepadEmulationMode == EmuKeyboardAndMouse || AppStatus.GamepadEmulationMode == EmuGamepadEnabled))
 			if ((PrimaryGamepad.InputState.buttons & JSMASK_PS && (PrimaryGamepad.InputState.buttons & JSMASK_UP || PrimaryGamepad.InputState.buttons & JSMASK_DOWN)) ||
 				((IsKeyPressed(VK_MENU) && (IsKeyPressed(VK_UP) || IsKeyPressed(VK_DOWN))) && GetConsoleWindow() == GetForegroundWindow()))
@@ -2529,14 +2483,6 @@ int main(int argc, char **argv)
 				AppStatus.ExternalPedalsMode = ExPedalsDependentMode;
 			else
 				AppStatus.ExternalPedalsMode = ExPedalsAlwaysRacing;
-			MainTextUpdate();
-			AppStatus.SkipPollCount = AppStatus.SkipPollTimeOut;
-		}
-
-		// Enable/Disable motion aiming & driving
-		if (AppStatus.SkipPollCount == 0 && IsKeyPressed(VK_MENU) && (IsKeyPressed('5') || IsKeyPressed('6'))) {
-			if (IsKeyPressed('5')) AppStatus.DisableAiming = !AppStatus.DisableAiming;
-			if (IsKeyPressed('6')) AppStatus.DisableDriving = !AppStatus.DisableDriving;
 			MainTextUpdate();
 			AppStatus.SkipPollCount = AppStatus.SkipPollTimeOut;
 		}
@@ -3098,13 +3044,17 @@ int main(int argc, char **argv)
 				report.wButtons |= PrimaryGamepad.InputState.buttons & JSMASK_SHARE ? CurrentXboxProfile.Back : 0;
 				report.wButtons |= PrimaryGamepad.InputState.buttons & JSMASK_OPTIONS ? CurrentXboxProfile.Start : 0;
 			}
-		} else if (JslGetControllerType(PrimaryGamepad.DeviceIndex) == JS_TYPE_PRO_CONTROLLER || JslGetControllerType(PrimaryGamepad.DeviceIndex) == JS_TYPE_JOYCON_LEFT || JslGetControllerType(PrimaryGamepad.DeviceIndex) == JS_TYPE_JOYCON_RIGHT) {
-			report.wButtons |= PrimaryGamepad.InputState.buttons & JSMASK_MINUS ? CurrentXboxProfile.Back : 0;
-			report.wButtons |= PrimaryGamepad.InputState.buttons & JSMASK_PLUS ? CurrentXboxProfile.Start : 0;
+		}
+		else if (JslGetControllerType(PrimaryGamepad.DeviceIndex) == JS_TYPE_PRO_CONTROLLER || JslGetControllerType(PrimaryGamepad.DeviceIndex) == JS_TYPE_JOYCON_LEFT || JslGetControllerType(PrimaryGamepad.DeviceIndex) == JS_TYPE_JOYCON_RIGHT) {
+			if (!(PrimaryGamepad.InputState.buttons & JSMASK_CAPTURE) && !(PrimaryGamepad.InputState.buttons & JSMASK_HOME)) { // Защита от протекания кнопок в игру при использовании хоткеев (CAPTURE / HOME)
+				report.wButtons |= PrimaryGamepad.InputState.buttons & JSMASK_MINUS ? CurrentXboxProfile.Back : 0;
+				report.wButtons |= PrimaryGamepad.InputState.buttons & JSMASK_PLUS ? CurrentXboxProfile.Start : 0;
+			}
 		}
 
-		unsigned int mappedButtons = PrimaryGamepad.InputState.buttons;		//@051 Новый код модификаторов PS и Capture через mappedButtons
-		if (mappedButtons & JSMASK_PS || mappedButtons & JSMASK_CAPTURE) {
+		unsigned int mappedButtons = PrimaryGamepad.InputState.buttons;		//@051 Новый код модификаторов PS HOME и Capture через mappedButtons
+		//if (mappedButtons & JSMASK_PS || mappedButtons & JSMASK_CAPTURE) {
+		if (mappedButtons & JSMASK_PS || mappedButtons & JSMASK_CAPTURE || mappedButtons & JSMASK_HOME) {
 			unsigned int hotkeyMask = JSMASK_UP | JSMASK_DOWN | JSMASK_LEFT | JSMASK_RIGHT | JSMASK_N | JSMASK_S | JSMASK_W | JSMASK_E | JSMASK_L | JSMASK_R | JSMASK_LCLICK | JSMASK_RCLICK | JSMASK_SHARE;
 			mappedButtons &= ~hotkeyMask; // Стираем кнопки хоткеев из маски для игры
 		}
@@ -3199,7 +3149,7 @@ int main(int argc, char **argv)
 			report.wButtons = (WORD)XboxButtons;
 		}
 		// Nintendo controllers buttons: Capture & Home - changing working mode + another controllers (with additional buttons with keyboard emulation)
-		//if ((IsKeyPressed(VK_MENU) && IsKeyPressed('1')) || (IsKeyPressed(VK_MENU) && IsKeyPressed('2')) ||		//@038 -Hotkey for all gamepads
+		//if ((IsKeyPressed(VK_MENU) && IsKeyPressed('1')) || (IsKeyPressed(VK_MENU) && IsKeyPressed('2')) ||		//@038 -Hotkeys for all gamepads
 			//JslGetControllerType(PrimaryGamepad.DeviceIndex) == JS_TYPE_PRO_CONTROLLER ||
 			//JslGetControllerType(PrimaryGamepad.DeviceIndex) == JS_TYPE_JOYCON_LEFT ||
 			//JslGetControllerType(PrimaryGamepad.DeviceIndex) == JS_TYPE_JOYCON_RIGHT) {
@@ -3483,7 +3433,7 @@ int main(int argc, char **argv)
 			if (!PrimaryGamepad.Motion.WasGyroActive) {	//start Ratchetdelay 
 				PrimaryGamepad.Motion.WasGyroActive = true;
 
-				//Включаем Ratchetdelay для MotionAimingMode
+				//@058 Включаем Ratchetdelay для MotionAimingMode
 				if (PrimaryGamepad.GamepadActionMode == MotionAimingMode) {
 					PrimaryGamepad.Motion.RatchetDelayMaxTimer = PrimaryGamepad.Motion.RatchetDelayTime / (AppStatus.SleepTimeOut == 0 ? 1 : AppStatus.SleepTimeOut);
 				}
@@ -3493,9 +3443,9 @@ int main(int argc, char **argv)
 				PrimaryGamepad.Motion.RatchetDelayTimer = PrimaryGamepad.Motion.RatchetDelayMaxTimer;
 
 				// ЖЕСТКО сбрасываем EMA-фильтр, чтобы убить "старую" инерцию
-				PrimaryGamepad.Motion.EmaGyroX = velocityX;
-				PrimaryGamepad.Motion.EmaGyroY = velocityY;
-				PrimaryGamepad.Motion.EmaGyroZ = velocityZ;
+				PrimaryGamepad.Motion.EmaGyroX = 0.0f;
+				PrimaryGamepad.Motion.EmaGyroY = 0.0f;
+				PrimaryGamepad.Motion.EmaGyroZ = 0.0f;
 			}
 
 			float effGyroX = velocityX;//Считываем кумулятивные данные один раз для режимов
@@ -4085,10 +4035,38 @@ int main(int argc, char **argv)
 			PrimaryGamepad.RumbleSkipCounter--;
 
 		if (AppStatus.SkipPollCount > 0) AppStatus.SkipPollCount--;
+
+		//@060 ТЕЛЕМЕТРИЯ в OSD
+		if (pTelemetry && PrimaryGamepad.DeviceIndex != -1) {
+			int aimingHandle = PrimaryGamepad.DeviceIndex;
+			if (PrimaryGamepad.DeviceIndex2 != -1 && !AppStatus.GyroFromLeft) {
+				aimingHandle = PrimaryGamepad.DeviceIndex2;
+			}
+
+			JSL_AUTO_CALIBRATION autoCal = JslGetAutoCalibrationStatus(aimingHandle);
+			float bx, by, bz;
+			JslGetCalibrationOffset(aimingHandle, bx, by, bz);
+
+			pTelemetry[0] = autoCal.confidence;
+			pTelemetry[1] = autoCal.isSteady ? 1.0f : 0.0f;
+			pTelemetry[2] = bx;
+			pTelemetry[3] = by;
+			pTelemetry[4] = JslGetPollRate(PrimaryGamepad.DeviceIndex);
+			pTelemetry[5] = PrimaryGamepad.DeviceIndex2 != -1 ? JslGetPollRate(PrimaryGamepad.DeviceIndex2) : 0.0f;
+			pTelemetry[6] = JslGetBattery(PrimaryGamepad.DeviceIndex);
+			pTelemetry[7] = PrimaryGamepad.DeviceIndex2 != -1 ? JslGetBattery(PrimaryGamepad.DeviceIndex2) : -1.0f;
+			pTelemetry[8] = (float)JslGetControllerType(PrimaryGamepad.DeviceIndex);
+			pTelemetry[9] = PrimaryGamepad.DeviceIndex2 != -1 ? (float)JslGetControllerType(PrimaryGamepad.DeviceIndex2) : 0.0f;
+		}
+
 		Sleep(AppStatus.SleepTimeOut);
 	}
 
 	timeEndPeriod(1);
+
+	if (AppStatus.IsOsdActive) {
+		system("taskkill /IM OSD.exe /F > nul 2>&1");
+	}
 
 	// Reset keyboard motion driving
 	if (AppStatus.GamepadEmulationMode == EmuKeyboardAndMouse && PrimaryGamepad.GamepadActionMode == MotionDrivingMode) {
@@ -4130,5 +4108,7 @@ int main(int argc, char **argv)
 
 		vigem_disconnect(client2);
 		vigem_free(client2);
+		if (pTelemetry) UnmapViewOfFile(pTelemetry); //060
+		if (hMapFile) CloseHandle(hMapFile);
 	}
 }

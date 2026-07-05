@@ -7,7 +7,7 @@ bool handle_input(JoyShock *jc, uint8_t *packet, int len, bool &hasIMU) {
 	hasIMU = true;
 	if (packet[0] == 0) return false; // ignore non-responses
 
-	// Создаем локальные буферы на стеке для безопасного разбора без блокировок
+	//@601 Создаем локальные буферы на стеке для безопасного разбора без блокировок
 	JOY_SHOCK_STATE local_simple_state = jc->simple_state;
 	local_simple_state.buttons = 0;
 
@@ -339,7 +339,8 @@ bool handle_input(JoyShock *jc, uint8_t *packet, int len, bool &hasIMU) {
 				jc->stick_cal_y_r);
 		}
 
-		jc->battery = (stick_data[1] & 0xF0) >> 4;
+		//jc->battery = (stick_data[1] & 0xF0) >> 4;
+		jc->battery = (packet[2] & 0xF0) >> 4; //@602 Fix wrong bit data read
 
 		// Accelerometer:
 		{

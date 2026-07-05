@@ -891,10 +891,24 @@ float JslGetPollRate(int deviceId)
 	std::shared_lock<std::shared_timed_mutex> lock(_connectedLock);
 	JoyShock* jc = GetJoyShockFromHandle(deviceId);
 	if (jc != nullptr) {
-		return jc->controller_type != ControllerType::n_switch ? 250.0f : 66.6667f;
+		//return jc->controller_type != ControllerType::n_switch ? 250.0f : 66.6667f;
+		return (float)jc->current_polling_rate; //@204 Выводим реальную герцовку!
 	}
 	return 0.0f;
 }
+
+//@205 Добавляем функцию для извлечения батареи напрямую из Bluetooth-пакетов
+float JslGetBattery(int deviceId)
+{
+	std::shared_lock<std::shared_timed_mutex> lock(_connectedLock);
+	JoyShock* jc = GetJoyShockFromHandle(deviceId);
+	if (jc != nullptr && jc->controller_type == ControllerType::n_switch) {
+		float bat = (float)jc->battery * 12.5f;
+		return bat > 100.0f ? 100.0f : bat; // Отсекаем аномальные значения клонов (Mobapad) на 100%
+	}
+	return -1.0f;
+}
+
 float JslGetTimeSinceLastUpdate(int deviceId)
 {
 	std::shared_lock<std::shared_timed_mutex> lock(_connectedLock);
