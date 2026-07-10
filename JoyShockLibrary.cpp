@@ -952,6 +952,21 @@ void JslSetAutomaticCalibration(int deviceId, bool enabled) {
 		jc->modifying_lock.unlock();
 	}
 }
+void JslSetStillnessSettings(int deviceId, float maxError, float minCollectionTime, float minCorrectionTime, float easeInTime) {	//@206
+	std::shared_lock<std::shared_timed_mutex> lock(_connectedLock);
+	JoyShock* jc = GetJoyShockFromHandle(deviceId);
+	if (jc != nullptr) {
+		jc->modifying_lock.lock();
+		// Защита: применяем кастомные таймеры ТОЛЬКО для контроллеров Nintendo
+		if (jc->controller_type == ControllerType::n_switch) {
+			jc->motion.Settings.MaxStillnessError = maxError;
+			jc->motion.Settings.MinStillnessCollectionTime = minCollectionTime;
+			jc->motion.Settings.MinStillnessCorrectionTime = minCorrectionTime;
+			jc->motion.Settings.StillnessCalibrationEaseInTime = easeInTime;
+		}
+		jc->modifying_lock.unlock();
+	}
+}
 void JslGetCalibrationOffset(int deviceId, float& xOffset, float& yOffset, float& zOffset) {
 	std::shared_lock<std::shared_timed_mutex> lock(_connectedLock);
 	JoyShock* jc = GetJoyShockFromHandle(deviceId);

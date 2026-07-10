@@ -243,7 +243,8 @@ public:
 	void GetPlayerSpaceGyro(float& x, float& y, const float yawRelaxFactor = 1.41f);
 	static void CalculatePlayerSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float yawRelaxFactor = 1.41f);
 	void GetWorldSpaceGyro(float& x, float& y, const float sideReductionThreshold = 0.125f);
-	static void CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold = 0.125f, bool isHybrid = false);	//@401 add bool isHybrid = false for case 3
+	static void CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold = 0.125f);
+	//static void CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold = 0.125f, bool isHybrid = false);	//@401 add bool isHybrid = false for case 3
 
 	// gyro calibration functions
 	void StartContinuousCalibration();
@@ -882,6 +883,13 @@ namespace GamepadMotionHelpers
 		else
 		{
 			RecalibrateThreshold = std::min(RecalibrateThreshold + stillnessErrorClimbRate * deltaTime, maxStillnessError);
+			//@402 Adaptive Noise Threshold. ≈сли геймпад провалил проверку, но текущий шум всЄ еще очень мал (меньше 0.5 град/сек), это значит, что геймпад 
+			//скорее всего лежит на столе, но датчик стал шуметь сильнее. ѕлавно подт€гиваем застр€вший минимальный порог к новому уровню шума.
+			if (gyroDelta.x < 0.5f && gyroDelta.y < 0.5f && gyroDelta.z < 0.5f) {	// ѕорог
+				const float relaxRate = 1.0f * deltaTime;	//скорость применени€ 2f - 200%
+				if (stillnessGyroDelta < 0.f) MinDeltaGyro = MinDeltaGyro.Lerp(gyroDelta, relaxRate);
+				if (stillnessAccelDelta < 0.f) MinDeltaAccel = MinDeltaAccel.Lerp(accelDelta, relaxRate);
+			}
 			MinMaxWindow.Reset(0.f);
 		}
 
@@ -1180,10 +1188,12 @@ inline void GamepadMotion::GetWorldSpaceGyro(float& x, float& y, const float sid
 	CalculateWorldSpaceGyro(x, y, Gyro.x, Gyro.y, Gyro.z, Motion.Grav.x, Motion.Grav.y, Motion.Grav.z, sideReductionThreshold);
 }
 
-inline void GamepadMotion::CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold, bool isHybrid)	//@401 add bool isHybrid for case 3
+inline void GamepadMotion::CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold)
+//inline void GamepadMotion::CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold, bool isHybrid)	//@401 add bool isHybrid for case 3
 {
 	// use the gravity direction as the yaw axis, and derive an appropriate pitch axis. Explained in depth at http://gyrowiki.jibbsmart.com/blog:player-space-gyro-and-alternatives-explained#toc6
 	const float worldYaw = -gravX * gyroX - gravY * gyroY - gravZ * gyroZ;
+	//const float worldYaw = -gravX * gyroX - gravY * gyroY - 0.0f;
 	// project local pitch axis (X) onto gravity plane
 	const float gravDotPitchAxis = gravX;
 	GamepadMotionHelpers::Vec pitchAxis(1.f - gravX * gravDotPitchAxis,
@@ -1208,19 +1218,19 @@ inline void GamepadMotion::CalculateWorldSpaceGyro(float& x, float& y, const flo
 		x = 0.f;
 	}
 
-	//y = worldYaw; //original
+	y = worldYaw; //original
 	//y = worldYaw * (1.0f - gravZ * gravZ); // затухание при приближении к вертикали (ZR в потолок)
 
-	if (isHybrid) {		//@401 новый case 3, переход из World в local в зависимости от угла по вертикали
+	/*if (isHybrid) {		//@401 новый case 3, переход из World в local в зависимости от угла по вертикали
 		const float blend = gravZ * gravZ;	// local включаетс€ при больших вертикальных углах
 		//const float blend = std::abs(gravZ);	// после 45 гр.
 		//const float blend = std::min(1.0f, std::abs(gravZ) * 1.5f);	//local 100% уже при 42 гр.
 		//const float blend = sqrtf(std::abs(gravZ));	//ранний старт local
-		y = (1.0f - blend) * worldYaw + blend * gyroY;
+		//y = (1.0f - blend) * worldYaw + blend * gyroY;
 	}
 	else {
 		y = worldYaw;
-	}
+	}*/
 }
 
 // gyro calibration functions
