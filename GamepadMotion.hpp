@@ -244,7 +244,9 @@ public:
 	static void CalculatePlayerSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float yawRelaxFactor = 1.41f);
 	void GetWorldSpaceGyro(float& x, float& y, const float sideReductionThreshold = 0.125f);
 	static void CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold = 0.125f);
-	//static void CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold = 0.125f, bool isHybrid = false);	//@401 add bool isHybrid = false for case 3
+	//static void CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold = 0.125f, bool isHybrid = false);	//@401 OLD (add bool isHybrid = false for case 3)
+	void GetHybridSpaceGyro(float& x, float& y, const float sideReductionThreshold = 0.125f);	//@401 new case 3. No further interference with the X-axis control when rotating (counter or clockwise) the hand during a horizontal grip
+	static void CalculateHybridSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold = 0.125f);
 
 	// gyro calibration functions
 	void StartContinuousCalibration();
@@ -883,10 +885,12 @@ namespace GamepadMotionHelpers
 		else
 		{
 			RecalibrateThreshold = std::min(RecalibrateThreshold + stillnessErrorClimbRate * deltaTime, maxStillnessError);
-			//@402 Adaptive Noise Threshold. ≈сли геймпад провалил проверку, но текущий шум всЄ еще очень мал (меньше 0.5 град/сек), это значит, что геймпад 
-			//скорее всего лежит на столе, но датчик стал шуметь сильнее. ѕлавно подт€гиваем застр€вший минимальный порог к новому уровню шума.
-			if (gyroDelta.x < 0.5f && gyroDelta.y < 0.5f && gyroDelta.z < 0.5f) {	// ѕорог
-				const float relaxRate = 1.0f * deltaTime;	//скорость применени€ 2f - 200%
+
+			//@402 Adaptive Noise Threshold (Time-Corrected Hybrid Fix). ѕорог 0.5 град/сек универсален: это физический предел дрожи рук.
+			if (gyroDelta.x < 0.5f && gyroDelta.y < 0.5f && gyroDelta.z < 0.5f) {
+				// »спользуем реальное врем€ накоплени€ окна, а не deltaTime одного кадра!
+				// –аботает через MinStillnessCollectionTime, то есть примен€етс€ за 0,5 сек.
+				const float relaxRate = std::min(MinMaxWindow.TimeSampled, 1.0f);
 				if (stillnessGyroDelta < 0.f) MinDeltaGyro = MinDeltaGyro.Lerp(gyroDelta, relaxRate);
 				if (stillnessAccelDelta < 0.f) MinDeltaAccel = MinDeltaAccel.Lerp(accelDelta, relaxRate);
 			}
@@ -1189,7 +1193,7 @@ inline void GamepadMotion::GetWorldSpaceGyro(float& x, float& y, const float sid
 }
 
 inline void GamepadMotion::CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold)
-//inline void GamepadMotion::CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold, bool isHybrid)	//@401 add bool isHybrid for case 3
+//inline void GamepadMotion::CalculateWorldSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold, bool isHybrid)	//@401 OLD (add bool isHybrid for case 3)
 {
 	// use the gravity direction as the yaw axis, and derive an appropriate pitch axis. Explained in depth at http://gyrowiki.jibbsmart.com/blog:player-space-gyro-and-alternatives-explained#toc6
 	const float worldYaw = -gravX * gyroX - gravY * gyroY - gravZ * gyroZ;
@@ -1219,9 +1223,8 @@ inline void GamepadMotion::CalculateWorldSpaceGyro(float& x, float& y, const flo
 	}
 
 	y = worldYaw; //original
-	//y = worldYaw * (1.0f - gravZ * gravZ); // затухание при приближении к вертикали (ZR в потолок)
 
-	/*if (isHybrid) {		//@401 новый case 3, переход из World в local в зависимости от угла по вертикали
+	/*if (isHybrid) {		//@401 OLD case 3, переход из World в local в зависимости от угла по вертикали
 		const float blend = gravZ * gravZ;	// local включаетс€ при больших вертикальных углах
 		//const float blend = std::abs(gravZ);	// после 45 гр.
 		//const float blend = std::min(1.0f, std::abs(gravZ) * 1.5f);	//local 100% уже при 42 гр.
@@ -1231,6 +1234,48 @@ inline void GamepadMotion::CalculateWorldSpaceGyro(float& x, float& y, const flo
 	else {
 		y = worldYaw;
 	}*/
+}
+
+inline void GamepadMotion::GetHybridSpaceGyro(float& x, float& y, const float sideReductionThreshold)
+{
+	CalculateHybridSpaceGyro(x, y, Gyro.x, Gyro.y, Gyro.z, Motion.Grav.x, Motion.Grav.y, Motion.Grav.z, sideReductionThreshold);
+}
+
+//@401 NEW Case 3 (True 2D World Space). ѕопытка минимизировать вли€ние на управление осью X движением кисти "отвЄртка" при вертикальном хвате
+inline void GamepadMotion::CalculateHybridSpaceGyro(float& x, float& y, const float gyroX, const float gyroY, const float gyroZ, const float gravX, const float gravY, const float gravZ, const float sideReductionThreshold)
+{
+	// 1. √оризонтальный прицел (Yaw) Ч жесткий и точный расчет (до упора в вертикаль без искажений)
+	float grav2D_len = sqrtf(gravX * gravX + gravY * gravY);
+	float normGravX = grav2D_len > 0.001f ? (gravX / grav2D_len) : 0.0f;
+	float normGravY = grav2D_len > 0.001f ? (gravY / grav2D_len) : -1.0f;
+	const float worldYaw = -normGravX * gyroX - normGravY * gyroY;
+
+	// 2. ¬ертикальный прицел (Pitch) с проекцией на плоскость гравитации
+	const float gravDotPitchAxis = gravX;
+	GamepadMotionHelpers::Vec pitchAxis(1.f - gravX * gravDotPitchAxis,
+		-gravY * gravDotPitchAxis,
+		-gravZ * gravDotPitchAxis);
+
+	const float pitchAxisLengthSquared = pitchAxis.LengthSquared();
+	if (pitchAxisLengthSquared > 0.f)
+	{
+		const float pitchAxisLength = sqrtf(pitchAxisLengthSquared);
+		const float lengthReciprocal = 1.f / pitchAxisLength;
+		pitchAxis *= lengthReciprocal;
+
+		const float flatness = std::abs(gravY);
+		const float upness = std::abs(gravZ);
+		const float sideReduction = sideReductionThreshold <= 0.f ? 1.f : std::clamp((std::max(flatness, upness) - sideReductionThreshold) / sideReductionThreshold, 0.f, 1.f);
+
+		// ћикро-оптимизаци€: раскрыто векторное умножение без участи€ gyroZ (отвертки)
+		x = sideReduction * (pitchAxis.x * gyroX + pitchAxis.y * gyroY);
+	}
+	else
+	{
+		x = 0.f;
+	}
+
+	y = worldYaw;
 }
 
 // gyro calibration functions

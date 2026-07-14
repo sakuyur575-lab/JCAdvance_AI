@@ -928,6 +928,42 @@ void JslResetContinuousCalibration(int deviceId) {
 		jc->reset_continuous_calibration();
 	}
 }
+void JslResetAccelerometerCalibration(int deviceId)	//@207
+{
+	std::shared_lock<std::shared_timed_mutex> lock(_connectedLock);
+	JoyShock* jc = GetJoyShockFromHandle(deviceId);
+	if (jc != nullptr && jc->controller_type == ControllerType::n_switch) {
+		jc->modifying_lock.lock();
+
+		// Восстанавливаем физическое ускорение из обработанного imu_state
+		float currX = -jc->imu_state.accelX;
+		float currY = jc->imu_state.accelY;
+		float currZ = -jc->imu_state.accelZ;
+
+		// Ищем ось, на которую давит гравитация (самая большая по модулю)
+		float targetX = 0.0f, targetY = 0.0f, targetZ = 0.0f;
+		if (std::abs(currX) > std::abs(currY) && std::abs(currX) > std::abs(currZ)) {
+			targetX = currX > 0 ? 1.0f : -1.0f;
+		}
+		else if (std::abs(currY) > std::abs(currX) && std::abs(currY) > std::abs(currZ)) {
+			targetY = currY > 0 ? 1.0f : -1.0f;
+		}
+		else {
+			targetZ = currZ > 0 ? 1.0f : -1.0f;
+		}
+
+		// Вычисляем и применяем "хак" памяти (сдвигаем нули)
+		// Physical X = index 0, Physical Y = index 2, Physical Z = index 1
+		if (jc->acc_cal_coeff[0] != 0.0f)
+			jc->sensor_cal[0][0] += (int16_t)((currX - targetX) / jc->acc_cal_coeff[0]);
+		if (jc->acc_cal_coeff[2] != 0.0f)
+			jc->sensor_cal[0][2] += (int16_t)((currY - targetY) / jc->acc_cal_coeff[2]);
+		if (jc->acc_cal_coeff[1] != 0.0f)
+			jc->sensor_cal[0][1] += (int16_t)((currZ - targetZ) / jc->acc_cal_coeff[1]);
+
+		jc->modifying_lock.unlock();
+	}
+}
 void JslStartContinuousCalibration(int deviceId) {
 	std::shared_lock<std::shared_timed_mutex> lock(_connectedLock);
 	JoyShock* jc = GetJoyShockFromHandle(deviceId);
@@ -957,12 +993,25 @@ void JslSetStillnessSettings(int deviceId, float maxError, float minCollectionTi
 	JoyShock* jc = GetJoyShockFromHandle(deviceId);
 	if (jc != nullptr) {
 		jc->modifying_lock.lock();
-		// Защита: применяем кастомные таймеры ТОЛЬКО для контроллеров Nintendo
-		if (jc->controller_type == ControllerType::n_switch) {
+		if (jc->controller_type == ControllerType::n_switch) { 		//for Nintendo only
 			jc->motion.Settings.MaxStillnessError = maxError;
 			jc->motion.Settings.MinStillnessCollectionTime = minCollectionTime;
 			jc->motion.Settings.MinStillnessCorrectionTime = minCorrectionTime;
 			jc->motion.Settings.StillnessCalibrationEaseInTime = easeInTime;
+		}
+		jc->modifying_lock.unlock();
+	}
+}
+void JslSetGravitySettings(int deviceId, float shakinessMin, float shakinessMax, float stillSpeed, float shakySpeed) {	//@206
+	std::shared_lock<std::shared_timed_mutex> lock(_connectedLock);
+	JoyShock* jc = GetJoyShockFromHandle(deviceId);
+	if (jc != nullptr) {
+		jc->modifying_lock.lock();
+		if (jc->controller_type == ControllerType::n_switch) {		// for Nintendo only
+			jc->motion.Settings.GravityCorrectionShakinessMinThreshold = shakinessMin;
+			jc->motion.Settings.GravityCorrectionShakinessMaxThreshold = shakinessMax;
+			jc->motion.Settings.GravityCorrectionStillSpeed = stillSpeed;
+			jc->motion.Settings.GravityCorrectionShakySpeed = shakySpeed;
 		}
 		jc->modifying_lock.unlock();
 	}

@@ -440,10 +440,11 @@ public:
 			GamepadMotion::CalculatePlayerSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);
 			gyroZ = 0.f;
 			break;
-		/*case 3: //@303 Наш новый гибридный режим (принудительно передаем true на конце)
-			GamepadMotion::CalculateWorldSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ, 0.125f, true);
+		case 3: 
+			//GamepadMotion::CalculateWorldSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ, 0.125f, true); //OLD Case3 (принудительно передаем true на конце)
+			GamepadMotion::CalculateHybridSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);	//@303 NEW case 3
 			gyroZ = 0.f;
-			break;*/
+			break;
 		}
 	}
 
@@ -501,10 +502,11 @@ public:
 			GamepadMotion::CalculatePlayerSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);
 			gyroZ = 0.f;
 			break;
-		/*case 3: //@303 Наш новый гибридный режим (принудительно передаем true на конце)
-			GamepadMotion::CalculateWorldSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ, 0.125f, true);
+		case 3:
+			//GamepadMotion::CalculateWorldSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ, 0.125f, true); //OLD Case3 (принудительно передаем true на конце)
+			GamepadMotion::CalculateHybridSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);	//@303 NEW case 3
 			gyroZ = 0.f;
-			break;*/
+			break;
 		}
 
 		IMU_STATE transformedState = IMU_STATE();
@@ -539,10 +541,11 @@ public:
 			GamepadMotion::CalculatePlayerSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);
 			gyroZ = 0.f;
 			break;
-		/*case 3: //@303 Наш новый гибридный режим (принудительно передаем true на конце)
-			GamepadMotion::CalculateWorldSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ, 0.125f, true);
+		case 3:
+			//GamepadMotion::CalculateWorldSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ, 0.125f, true); //OLD Case3 (принудительно передаем true на конце)
+			GamepadMotion::CalculateHybridSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);	//@303 NEW case 3
 			gyroZ = 0.f;
-			break;*/
+			break;
 		}
 		IMU_STATE transformedState = IMU_STATE();
 		transformedState.accelX = imu_state.accelX;

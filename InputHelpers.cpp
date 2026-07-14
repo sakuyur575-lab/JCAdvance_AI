@@ -344,7 +344,7 @@ bool handle_input(JoyShock *jc, uint8_t *packet, int len, bool &hasIMU) {
 
 		// Accelerometer:
 		{
-			float accelSampleZ = (float)uint16_to_int16(packet[13] | (packet[14] << 8) & 0xFF00) * jc->acc_cal_coeff[0];
+			/*float accelSampleZ = (float)uint16_to_int16(packet[13] | (packet[14] << 8) & 0xFF00) * jc->acc_cal_coeff[0];
 			float accelSampleX = (float)uint16_to_int16(packet[15] | (packet[16] << 8) & 0xFF00) * jc->acc_cal_coeff[1];
 			float accelSampleY = (float)uint16_to_int16(packet[17] | (packet[18] << 8) & 0xFF00) * jc->acc_cal_coeff[2];
 			float gyroSampleX = (float)uint16_to_int16(packet[19] | (packet[20] << 8) & 0xFF00) * jc->gyro_cal_coeff[0];
@@ -392,6 +392,86 @@ bool handle_input(JoyShock *jc, uint8_t *packet, int len, bool &hasIMU) {
 			totalGyroX += gyroSampleX - jc->sensor_cal[1][0];
 			totalGyroY += gyroSampleY - jc->sensor_cal[1][1];
 			totalGyroZ += gyroSampleZ - jc->sensor_cal[1][2];
+
+			// average the 3 samples
+			accelX /= 3;
+			accelY /= 3;
+			accelZ /= 3;
+			totalGyroX /= 3;
+			totalGyroY /= 3;
+			totalGyroZ /= 3;*/
+
+			//@603 Sample 1 (Physical Axes from packet: Y, X, Z)
+			int16_t rawAccelY = uint16_to_int16(packet[13] | (packet[14] << 8) & 0xFF00);
+			int16_t rawAccelX = uint16_to_int16(packet[15] | (packet[16] << 8) & 0xFF00);
+			int16_t rawAccelZ = uint16_to_int16(packet[17] | (packet[18] << 8) & 0xFF00);
+			int16_t rawGyroY = uint16_to_int16(packet[19] | (packet[20] << 8) & 0xFF00);
+			int16_t rawGyroX = uint16_to_int16(packet[21] | (packet[22] << 8) & 0xFF00);
+			int16_t rawGyroZ = uint16_to_int16(packet[23] | (packet[24] << 8) & 0xFF00);
+
+			if ((rawAccelX | rawAccelY | rawAccelZ | rawGyroX | rawGyroY | rawGyroZ) == 0) {
+				hasIMU = false;
+			}
+
+			// Correct Formula: (Raw - Hardware_Zero_Offset) * Multiplier (matching proper physical axes)
+			float accelSampleZ = ((float)rawAccelY - jc->sensor_cal[0][1]) * jc->acc_cal_coeff[1];
+			float accelSampleX = ((float)rawAccelX - jc->sensor_cal[0][0]) * jc->acc_cal_coeff[0];
+			float accelSampleY = ((float)rawAccelZ - jc->sensor_cal[0][2]) * jc->acc_cal_coeff[2];
+
+			float gyroSampleX = ((float)rawGyroY - jc->sensor_cal[1][1]) * jc->gyro_cal_coeff[1];
+			float gyroSampleY = ((float)rawGyroX - jc->sensor_cal[1][0]) * jc->gyro_cal_coeff[0];
+			float gyroSampleZ = ((float)rawGyroZ - jc->sensor_cal[1][2]) * jc->gyro_cal_coeff[2];
+
+			float accelX = accelSampleX;
+			float accelY = accelSampleY;
+			float accelZ = accelSampleZ;
+			float totalGyroX = gyroSampleX; // Offset is already subtracted mathematically
+			float totalGyroY = gyroSampleY;
+			float totalGyroZ = gyroSampleZ;
+
+			// Sample 2
+			rawAccelY = uint16_to_int16(packet[25] | (packet[26] << 8) & 0xFF00);
+			rawAccelX = uint16_to_int16(packet[27] | (packet[28] << 8) & 0xFF00);
+			rawAccelZ = uint16_to_int16(packet[29] | (packet[30] << 8) & 0xFF00);
+			rawGyroY = uint16_to_int16(packet[31] | (packet[32] << 8) & 0xFF00);
+			rawGyroX = uint16_to_int16(packet[33] | (packet[34] << 8) & 0xFF00);
+			rawGyroZ = uint16_to_int16(packet[35] | (packet[36] << 8) & 0xFF00);
+
+			accelSampleZ = ((float)rawAccelY - jc->sensor_cal[0][1]) * jc->acc_cal_coeff[1];
+			accelSampleX = ((float)rawAccelX - jc->sensor_cal[0][0]) * jc->acc_cal_coeff[0];
+			accelSampleY = ((float)rawAccelZ - jc->sensor_cal[0][2]) * jc->acc_cal_coeff[2];
+			gyroSampleX = ((float)rawGyroY - jc->sensor_cal[1][1]) * jc->gyro_cal_coeff[1];
+			gyroSampleY = ((float)rawGyroX - jc->sensor_cal[1][0]) * jc->gyro_cal_coeff[0];
+			gyroSampleZ = ((float)rawGyroZ - jc->sensor_cal[1][2]) * jc->gyro_cal_coeff[2];
+
+			accelX += accelSampleX;
+			accelY += accelSampleY;
+			accelZ += accelSampleZ;
+			totalGyroX += gyroSampleX;
+			totalGyroY += gyroSampleY;
+			totalGyroZ += gyroSampleZ;
+
+			// Sample 3
+			rawAccelY = uint16_to_int16(packet[37] | (packet[38] << 8) & 0xFF00);
+			rawAccelX = uint16_to_int16(packet[39] | (packet[40] << 8) & 0xFF00);
+			rawAccelZ = uint16_to_int16(packet[41] | (packet[42] << 8) & 0xFF00);
+			rawGyroY = uint16_to_int16(packet[43] | (packet[44] << 8) & 0xFF00);
+			rawGyroX = uint16_to_int16(packet[45] | (packet[46] << 8) & 0xFF00);
+			rawGyroZ = uint16_to_int16(packet[47] | (packet[48] << 8) & 0xFF00);
+
+			accelSampleZ = ((float)rawAccelY - jc->sensor_cal[0][1]) * jc->acc_cal_coeff[1];
+			accelSampleX = ((float)rawAccelX - jc->sensor_cal[0][0]) * jc->acc_cal_coeff[0];
+			accelSampleY = ((float)rawAccelZ - jc->sensor_cal[0][2]) * jc->acc_cal_coeff[2];
+			gyroSampleX = ((float)rawGyroY - jc->sensor_cal[1][1]) * jc->gyro_cal_coeff[1];
+			gyroSampleY = ((float)rawGyroX - jc->sensor_cal[1][0]) * jc->gyro_cal_coeff[0];
+			gyroSampleZ = ((float)rawGyroZ - jc->sensor_cal[1][2]) * jc->gyro_cal_coeff[2];
+
+			accelX += accelSampleX;
+			accelY += accelSampleY;
+			accelZ += accelSampleZ;
+			totalGyroX += gyroSampleX;
+			totalGyroY += gyroSampleY;
+			totalGyroZ += gyroSampleZ;
 
 			// average the 3 samples
 			accelX /= 3;

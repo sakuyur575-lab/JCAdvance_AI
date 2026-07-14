@@ -229,6 +229,7 @@ extern "C" JOY_SHOCK_API void JslStartContinuousCalibration(int deviceId);
 extern "C" JOY_SHOCK_API void JslPauseContinuousCalibration(int deviceId);
 extern "C" JOY_SHOCK_API void JslSetAutomaticCalibration(int deviceId, bool enabled);
 extern "C" JOY_SHOCK_API void JslSetStillnessSettings(int deviceId, float maxError, float minCollectionTime, float minCorrectionTime, float easeInTime);	//@502
+extern "C" JOY_SHOCK_API void JslSetGravitySettings(int deviceId, float shakinessMin, float shakinessMax, float stillSpeed, float shakySpeed);		//@502
 extern "C" JOY_SHOCK_API void JslGetCalibrationOffset(int deviceId, float& xOffset, float& yOffset, float& zOffset);
 extern "C" JOY_SHOCK_API void JslSetCalibrationOffset(int deviceId, float xOffset, float yOffset, float zOffset);
 extern "C" JOY_SHOCK_API JSL_AUTO_CALIBRATION JslGetAutoCalibrationStatus(int deviceId);
@@ -252,6 +253,8 @@ extern "C" JOY_SHOCK_API int JslGetControllerSplitType(int deviceId);
 extern "C" JOY_SHOCK_API int JslGetControllerColour(int deviceId);
 // set controller light colour (not all controllers have a light whose colour can be set, but that just means nothing will be done when this is called -- no harm)
 extern "C" JOY_SHOCK_API void JslSetLightColour(int deviceId, int colour);
+//
+extern "C" JOY_SHOCK_API void JslResetAccelerometerCalibration(int deviceId);
 // set controller rumble
 extern "C" JOY_SHOCK_API void JslSetRumble(int deviceId, int smallRumble, int bigRumble);
 // set controller player number indicator (not all controllers have a number indicator which can be set, but that just means nothing will be done when this is called -- no harm)
