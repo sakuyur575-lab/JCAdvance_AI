@@ -329,9 +329,12 @@ This option controls how the gyroscope interprets hand movements into mouse/stic
 * **0 (Local Space):** Relies entirely on the gyroscope. Movement is calculated relative to the controller's plastic body, ignoring gravity <br>
 * **1 (World Space):** Relies on the gyroscope and accelerometer. It uses real-world gravity to separate horizontal and vertical aiming <br>
 * **2 (Player Space):** Relies on the gyroscope and accelerometer. For two-handed controllers
-* **3 (Planar Space):** Relies on the gyroscope and accelerometer. It mathematically projects movement onto a 2D plane, completely ignoring wrist-roll ("screwdriver" effect) at any grip angle
-⚠️
-For modes 1 2 3: If your in-game crosshair moves diagonally when you swipe your hands horizontally (cross-talk), your accelerometer is miscalibrated. Calibrate the accelerometer correctly (see harware calibration). If you cannot perform a hardware calibration of the accelerometer, use software calibration (hotkey) or Local Space mode only. <br>
+
+(!) New experimental setting: <br>
+* **3 (Planar Space):** Relies on the gyroscope and accelerometer. It mathematically projects movement onto a 2D plane, completely ignoring wrist-roll ("screwdriver" effect) at any grip angle. A limit has been added for extreme angles; otherwise, the direction of motion reverses. <br>
+Designed specifically for the Joy-Con
+
+⚠️ For modes 1 2 3: If your in-game crosshair moves diagonally when you swipe your hands horizontally (cross-talk), your accelerometer is miscalibrated. Calibrate the accelerometer correctly (see harware calibration). If you cannot perform a hardware calibration of the accelerometer, use software calibration (hotkey) or Local Space mode only. <br>
 
 In short: for two-handed gamepads, the recommended values are 0 or 2. For Joy-Con: 1 or 3.
 
