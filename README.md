@@ -330,7 +330,7 @@ This option controls how the gyroscope interprets hand movements into mouse/stic
 * **1 (World Space):** Relies on the gyroscope and accelerometer. It uses real-world gravity to separate horizontal and vertical aiming <br>
 * **2 (Player Space):** Relies on the gyroscope and accelerometer. For two-handed controllers
 
-(!) New experimental setting: <br>
+(!) New setting: <br>
 * **3 (Planar Space):** Relies on the gyroscope and accelerometer. It mathematically projects movement onto a 2D plane, completely ignoring wrist-roll ("screwdriver" effect) at any grip angle. A limit has been added for extreme angles; otherwise, the direction of motion reverses. <br>
 Designed specifically for the Joy-Con
 
