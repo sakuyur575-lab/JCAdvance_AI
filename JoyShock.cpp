@@ -398,7 +398,7 @@ public:
 		modifying_lock.lock();
 
 		//@304 ИНДИВИДУАЛЬНЫЙ ТЕСТ ГЕРЦОВКИ (Без static) c выводом в OSD
-		test_packet_count += num_cumulative_gyro_samples;
+		/*test_packet_count += num_cumulative_gyro_samples;
 
 		auto current_time = std::chrono::steady_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - test_last_time).count();
@@ -407,7 +407,21 @@ public:
 			current_polling_rate = test_packet_count; // Отдаем в публичную переменную
 			test_packet_count = 0;
 			test_last_time = current_time;
-		}		// КОНЕЦ ТЕСТА 
+		}*/		// КОНЕЦ ТЕСТА 
+
+		test_packet_count += num_cumulative_gyro_samples;		//@304 New OSD HZ
+
+		auto current_time = std::chrono::steady_clock::now();
+		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - test_last_time).count();
+
+		if (elapsed >= 1000) {
+			// Старая логика эмулятора
+			//current_polling_rate = test_packet_count;
+			current_polling_rate = (test_packet_count * 1000) / elapsed;
+			test_packet_count = 0;
+			// Обновляем единый таймер
+			test_last_time = current_time;
+		}
 
 		if (num_cumulative_gyro_samples == 0) {
 			gyroX = cumulative_gyro_x;
@@ -442,7 +456,7 @@ public:
 			break;
 		case 3: 
 			//GamepadMotion::CalculateWorldSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ, 0.125f, true); //OLD Case3 (принудительно передаем true на конце)
-			GamepadMotion::CalculateHybridSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);	//@303 NEW case 3
+			GamepadMotion::CalculatePlanarSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);	//@303 NEW case 3
 			gyroZ = 0.f;
 			break;
 		}
@@ -504,7 +518,7 @@ public:
 			break;
 		case 3:
 			//GamepadMotion::CalculateWorldSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ, 0.125f, true); //OLD Case3 (принудительно передаем true на конце)
-			GamepadMotion::CalculateHybridSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);	//@303 NEW case 3
+			GamepadMotion::CalculatePlanarSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);	//@303 NEW case 3
 			gyroZ = 0.f;
 			break;
 		}
@@ -543,7 +557,7 @@ public:
 			break;
 		case 3:
 			//GamepadMotion::CalculateWorldSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ, 0.125f, true); //OLD Case3 (принудительно передаем true на конце)
-			GamepadMotion::CalculateHybridSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);	//@303 NEW case 3
+			GamepadMotion::CalculatePlanarSpaceGyro(gyroX, gyroY, gyroX, gyroY, gyroZ, gravX, gravY, gravZ);	//@303 NEW case 3
 			gyroZ = 0.f;
 			break;
 		}
@@ -699,7 +713,7 @@ public:
 
 		// factory calibration:
 
-		if (this->left_right == 1 || this->left_right == 3) {
+		/*if (this->left_right == 1 || this->left_right == 3) {
 			stick_cal_x_l[1] = (factory_stick_cal[4] << 8) & 0xF00 | factory_stick_cal[3];
 			stick_cal_y_l[1] = (factory_stick_cal[5] << 4) | (factory_stick_cal[4] >> 4);
 			stick_cal_x_l[0] = stick_cal_x_l[1] - ((factory_stick_cal[7] << 8) & 0xF00 | factory_stick_cal[6]);
@@ -749,6 +763,46 @@ public:
 		else {
 			//FormJoy::myform1->textBox_rstick_ucal->Text = L"R Stick User:\r\nNo calibration";
 			//printf("no user Calibration data for right stick.\n");
+		}*/
+
+		// get stick calibration data:
+
+		// factory calibration:		//@xxx Analog Stick 12-bit Calibration Unpacking Fix. Fixed bitwise bit-bleed and byte-shift error during the unpacking of 12-bit factory 
+		if (this->left_right == 1 || this->left_right == 3) {	//and user analog stick calibration data from SPI flash memory. Replaced ambiguous implicit bit-shifts with explicit, standard-compliant nibble masks  (`0x0F` / `0xF0`),
+			stick_cal_x_l[1] = factory_stick_cal[3] | ((factory_stick_cal[4] & 0x0F) << 8);		//resolving a legacy indexing bug on the Y-axis and guaranteeing accurate stick centers and deadzone boundaries across all C++ compilers		
+			stick_cal_y_l[1] = ((factory_stick_cal[4] & 0xF0) >> 4) | (factory_stick_cal[5] << 4);	// 
+			stick_cal_x_l[0] = stick_cal_x_l[1] - (factory_stick_cal[6] | ((factory_stick_cal[7] & 0x0F) << 8));
+			stick_cal_y_l[0] = stick_cal_y_l[1] - (((factory_stick_cal[7] & 0xF0) >> 4) | (factory_stick_cal[8] << 4));	
+			stick_cal_x_l[2] = stick_cal_x_l[1] + (factory_stick_cal[0] | ((factory_stick_cal[1] & 0x0F) << 8));
+			stick_cal_y_l[2] = stick_cal_y_l[1] + (((factory_stick_cal[1] & 0xF0) >> 4) | (factory_stick_cal[2] << 4));
+		}
+
+		if (this->left_right == 2 || this->left_right == 3) {
+			stick_cal_x_r[1] = factory_stick_cal[9] | ((factory_stick_cal[10] & 0x0F) << 8);
+			stick_cal_y_r[1] = ((factory_stick_cal[10] & 0xF0) >> 4) | (factory_stick_cal[11] << 4);
+			stick_cal_x_r[0] = stick_cal_x_r[1] - (factory_stick_cal[12] | ((factory_stick_cal[13] & 0x0F) << 8));
+			stick_cal_y_r[0] = stick_cal_y_r[1] - (((factory_stick_cal[13] & 0xF0) >> 4) | (factory_stick_cal[14] << 4));
+			stick_cal_x_r[2] = stick_cal_x_r[1] + (factory_stick_cal[15] | ((factory_stick_cal[16] & 0x0F) << 8));
+			stick_cal_y_r[2] = stick_cal_y_r[1] + (((factory_stick_cal[16] & 0xF0) >> 4) | (factory_stick_cal[17] << 4));
+		}
+
+		// user calibration:
+		if ((user_stick_cal[0] | (user_stick_cal[1] << 8)) == 0xA1B2) {
+			stick_cal_x_l[1] = user_stick_cal[5] | ((user_stick_cal[6] & 0x0F) << 8);
+			stick_cal_y_l[1] = ((user_stick_cal[6] & 0xF0) >> 4) | (user_stick_cal[7] << 4);
+			stick_cal_x_l[0] = stick_cal_x_l[1] - (user_stick_cal[8] | ((user_stick_cal[9] & 0x0F) << 8));
+			stick_cal_y_l[0] = stick_cal_y_l[1] - (((user_stick_cal[9] & 0xF0) >> 4) | (user_stick_cal[10] << 4));
+			stick_cal_x_l[2] = stick_cal_x_l[1] + (user_stick_cal[2] | ((user_stick_cal[3] & 0x0F) << 8));
+			stick_cal_y_l[2] = stick_cal_y_l[1] + (((user_stick_cal[3] & 0xF0) >> 4) | (user_stick_cal[4] << 4));
+		}
+
+		if ((user_stick_cal[0xB] | (user_stick_cal[0xC] << 8)) == 0xA1B2) {
+			stick_cal_x_r[1] = user_stick_cal[13] | ((user_stick_cal[14] & 0x0F) << 8);
+			stick_cal_y_r[1] = ((user_stick_cal[14] & 0xF0) >> 4) | (user_stick_cal[15] << 4);
+			stick_cal_x_r[0] = stick_cal_x_r[1] - (user_stick_cal[16] | ((user_stick_cal[17] & 0x0F) << 8));
+			stick_cal_y_r[0] = stick_cal_y_r[1] - (((user_stick_cal[17] & 0xF0) >> 4) | (user_stick_cal[18] << 4));
+			stick_cal_x_r[2] = stick_cal_x_r[1] + (user_stick_cal[19] | ((user_stick_cal[20] & 0x0F) << 8));
+			stick_cal_y_r[2] = stick_cal_y_r[1] + (((user_stick_cal[20] & 0xF0) >> 4) | (user_stick_cal[21] << 4));
 		}
 
 		// get gyro / accelerometer calibration data:
@@ -756,7 +810,7 @@ public:
 		// factory calibration:
 
 		// Acc cal origin position
-		sensor_cal[0][0] = uint16_to_int16(factory_sensor_cal[0] | factory_sensor_cal[1] << 8);
+		/*sensor_cal[0][0] = uint16_to_int16(factory_sensor_cal[0] | factory_sensor_cal[1] << 8);
 		sensor_cal[0][1] = uint16_to_int16(factory_sensor_cal[2] | factory_sensor_cal[3] << 8);
 		sensor_cal[0][2] = uint16_to_int16(factory_sensor_cal[4] | factory_sensor_cal[5] << 8);
 
@@ -808,7 +862,55 @@ public:
 		// Use SPI calibration and convert them to degrees per second
 		gyro_cal_coeff[0] = (float)(936.0 / (float)(13371 - uint16_to_int16(sensor_cal[1][0])));
 		gyro_cal_coeff[1] = (float)(936.0 / (float)(13371 - uint16_to_int16(sensor_cal[1][1])));
-		gyro_cal_coeff[2] = (float)(936.0 / (float)(13371 - uint16_to_int16(sensor_cal[1][2])));
+		gyro_cal_coeff[2] = (float)(936.0 / (float)(13371 - uint16_to_int16(sensor_cal[1][2])));*/
+
+
+		//@306
+		sensor_cal[0][0] = uint16_to_int16(factory_sensor_cal[0] | factory_sensor_cal[1] << 8);
+		sensor_cal[0][1] = uint16_to_int16(factory_sensor_cal[2] | factory_sensor_cal[3] << 8);
+		sensor_cal[0][2] = uint16_to_int16(factory_sensor_cal[4] | factory_sensor_cal[5] << 8);
+
+		sensor_cal[1][0] = uint16_to_int16(factory_sensor_cal[0xC] | factory_sensor_cal[0xD] << 8);
+		sensor_cal[1][1] = uint16_to_int16(factory_sensor_cal[0xE] | factory_sensor_cal[0xF] << 8);
+		sensor_cal[1][2] = uint16_to_int16(factory_sensor_cal[0x10] | factory_sensor_cal[0x11] << 8);
+
+		// factory calibration sensitivities:
+		int16_t acc_sens_x = uint16_to_int16(factory_sensor_cal[6] | factory_sensor_cal[7] << 8);
+		int16_t acc_sens_y = uint16_to_int16(factory_sensor_cal[8] | factory_sensor_cal[9] << 8);
+		int16_t acc_sens_z = uint16_to_int16(factory_sensor_cal[10] | factory_sensor_cal[11] << 8);
+
+		int16_t gyro_sens_x = uint16_to_int16(factory_sensor_cal[0x12] | factory_sensor_cal[0x13] << 8);
+		int16_t gyro_sens_y = uint16_to_int16(factory_sensor_cal[0x14] | factory_sensor_cal[0x15] << 8);
+		int16_t gyro_sens_z = uint16_to_int16(factory_sensor_cal[0x16] | factory_sensor_cal[0x17] << 8);
+
+		// user calibration:
+		if ((user_sensor_cal[0x0] | user_sensor_cal[0x1] << 8) == 0xA1B2) {
+			sensor_cal[0][0] = uint16_to_int16(user_sensor_cal[2] | user_sensor_cal[3] << 8);
+			sensor_cal[0][1] = uint16_to_int16(user_sensor_cal[4] | user_sensor_cal[5] << 8);
+			sensor_cal[0][2] = uint16_to_int16(user_sensor_cal[6] | user_sensor_cal[7] << 8);
+
+			sensor_cal[1][0] = uint16_to_int16(user_sensor_cal[0xE] | user_sensor_cal[0xF] << 8);
+			sensor_cal[1][1] = uint16_to_int16(user_sensor_cal[0x10] | user_sensor_cal[0x11] << 8);
+			sensor_cal[1][2] = uint16_to_int16(user_sensor_cal[0x12] | user_sensor_cal[0x13] << 8);
+
+			acc_sens_x = uint16_to_int16(user_sensor_cal[8] | user_sensor_cal[9] << 8);
+			acc_sens_y = uint16_to_int16(user_sensor_cal[10] | user_sensor_cal[11] << 8);
+			acc_sens_z = uint16_to_int16(user_sensor_cal[12] | user_sensor_cal[13] << 8);
+
+			gyro_sens_x = uint16_to_int16(user_sensor_cal[0x14] | user_sensor_cal[0x15] << 8);
+			gyro_sens_y = uint16_to_int16(user_sensor_cal[0x16] | user_sensor_cal[0x17] << 8);
+			gyro_sens_z = uint16_to_int16(user_sensor_cal[0x18] | user_sensor_cal[0x19] << 8);
+		}
+
+		// Calculate precise physical multipliers using unique chip sensitivity
+		// Nintendo IMU is set to ±4G, so we multiply by 4.0f to get accurate 1G vectors
+		acc_cal_coeff[0] = (1.0f / (float)(acc_sens_x - sensor_cal[0][0])) * 4.0f;
+		acc_cal_coeff[1] = (1.0f / (float)(acc_sens_y - sensor_cal[0][1])) * 4.0f;
+		acc_cal_coeff[2] = (1.0f / (float)(acc_sens_z - sensor_cal[0][2])) * 4.0f;
+
+		gyro_cal_coeff[0] = 936.0f / (float)(gyro_sens_x - sensor_cal[1][0]);
+		gyro_cal_coeff[1] = 936.0f / (float)(gyro_sens_y - sensor_cal[1][1]);
+		gyro_cal_coeff[2] = 936.0f / (float)(gyro_sens_z - sensor_cal[1][2]);
 
 		// Device colours
 		body_colour =

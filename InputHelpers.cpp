@@ -399,7 +399,7 @@ bool handle_input(JoyShock *jc, uint8_t *packet, int len, bool &hasIMU) {
 			accelZ /= 3;
 			totalGyroX /= 3;
 			totalGyroY /= 3;
-			totalGyroZ /= 3;*/
+			totalGyroZ /= 3;
 
 			//@603 Sample 1 (Physical Axes from packet: Y, X, Z)
 			int16_t rawAccelY = uint16_to_int16(packet[13] | (packet[14] << 8) & 0xFF00);
@@ -567,6 +567,162 @@ bool handle_input(JoyShock *jc, uint8_t *packet, int len, bool &hasIMU) {
 	jc->get_calibrated_gyro(imu_state.gyroX, imu_state.gyroY, imu_state.gyroZ);
 
 	// Атомарно обновляем состояния под мьютексом
+	jc->last_simple_state = jc->simple_state;
+	jc->simple_state = local_simple_state;
+
+	jc->last_touch_state = jc->touch_state;
+	jc->touch_state = local_touch_state;
+
+	jc->last_imu_state = jc->imu_state;
+	jc->imu_state = imu_state;
+	jc->modifying_lock.unlock();
+
+	return true;
+}*/
+//@604 Sequential Sub-Packet Processing (200Hz Unlock & Bitwise Fix)
+			float sub_dt = jc->delta_time / 3.0f;
+			float avgAccelX = 0.f, avgAccelY = 0.f, avgAccelZ = 0.f;
+			float avgGyroX = 0.f, avgGyroY = 0.f, avgGyroZ = 0.f;
+
+			jc->modifying_lock.lock();
+
+			for (int i = 0; i < 3; i++) {
+				int idx = 13 + (i * 12);
+
+				// Очищенный синтаксис битовых сдвигов (убран мусор & 0xFF00)
+				int16_t rawAccelY = uint16_to_int16(packet[idx] | (packet[idx + 1] << 8));
+				int16_t rawAccelX = uint16_to_int16(packet[idx + 2] | (packet[idx + 3] << 8));
+				int16_t rawAccelZ = uint16_to_int16(packet[idx + 4] | (packet[idx + 5] << 8));
+				int16_t rawGyroY = uint16_to_int16(packet[idx + 6] | (packet[idx + 7] << 8));
+				int16_t rawGyroX = uint16_to_int16(packet[idx + 8] | (packet[idx + 9] << 8));
+				int16_t rawGyroZ = uint16_to_int16(packet[idx + 10] | (packet[idx + 11] << 8));
+
+				if ((rawAccelX | rawAccelY | rawAccelZ | rawGyroX | rawGyroY | rawGyroZ) == 0) {
+					hasIMU = false;
+				}
+
+				//Part of 'Precise Factory SPI Sensor Calibration & Scaling'
+				//1. sensor_cal[0] и sensor_cal[1] — это индивидуальные нули из памяти SPI, вычитаем их из сырых байт до умножения
+				//2. acc_cal_coeff и gyro_cal_coeff — это уникальные заводские коэффициенты из JoyShock.cpp вместо 16384/13371 
+				float aX = ((float)rawAccelX - jc->sensor_cal[0][0]) * jc->acc_cal_coeff[0];
+				float aY = ((float)rawAccelY - jc->sensor_cal[0][1]) * jc->acc_cal_coeff[1];
+				float aZ = ((float)rawAccelZ - jc->sensor_cal[0][2]) * jc->acc_cal_coeff[2];
+
+				float gX = ((float)rawGyroX - jc->sensor_cal[1][0]) * jc->gyro_cal_coeff[0];
+				float gY = ((float)rawGyroY - jc->sensor_cal[1][1]) * jc->gyro_cal_coeff[1];
+				float gZ = ((float)rawGyroZ - jc->sensor_cal[1][2]) * jc->gyro_cal_coeff[2];
+
+				// Приведение к стандарту Y-up с сохранением физической разводки
+				float mapped_aX = -aX;
+				float mapped_aY = aZ;
+				float mapped_aZ = -aY;
+				float mapped_gX = -gX;
+				float mapped_gY = gZ;
+				float mapped_gZ = gY;
+
+				// Инверсия осей перенесена сюда (ДО отправки в библиотеку)
+				if (jc->left_right == 1) {
+					mapped_gZ = -mapped_gZ;
+				}
+				else if (jc->left_right == 2) {
+					mapped_aX = -mapped_aX;
+					mapped_aY = -mapped_aY;
+					//mapped_aZ = -mapped_aZ; //bad idea
+					mapped_gX = -mapped_gX;
+					mapped_gY = -mapped_gY;
+					mapped_gZ = -mapped_gZ;
+				}
+				else if (jc->left_right == 3) {
+					mapped_gZ = -mapped_gZ;
+				}
+
+				// Скармливаем библиотеке честные 200Hz с разделенным deltaTime
+				jc->push_sensor_samples(mapped_gX, mapped_gY, mapped_gZ, mapped_aX, mapped_aY, mapped_aZ, sub_dt);
+
+				// Получаем чистый гироскоп для каждого микро-сэмпла
+				float cal_gX, cal_gY, cal_gZ;
+				jc->get_calibrated_gyro(cal_gX, cal_gY, cal_gZ);
+
+				// Накапливаем сумму для финального кадра (66Hz)
+				avgAccelX += mapped_aX;
+				avgAccelY += mapped_aY;
+				avgAccelZ += mapped_aZ;
+				avgGyroX += cal_gX;
+				avgGyroY += cal_gY;
+				avgGyroZ += cal_gZ;
+			}
+
+			imu_state.accelX = avgAccelX / 3.0f;
+			imu_state.accelY = avgAccelY / 3.0f;
+			imu_state.accelZ = avgAccelZ / 3.0f;
+			imu_state.gyroX = avgGyroX / 3.0f;
+			imu_state.gyroY = avgGyroY / 3.0f;
+			imu_state.gyroZ = avgGyroZ / 3.0f;
+
+			jc->modifying_lock.unlock();
+		}
+	}
+
+	// handle buttons
+	{
+	// left:
+		if (jc->left_right == 1) {
+			local_simple_state.buttons |= ((buttons_pressed >> 1) << JSOFFSET_UP) & JSMASK_UP;
+			local_simple_state.buttons |= ((buttons_pressed) << JSOFFSET_DOWN) & JSMASK_DOWN;
+			local_simple_state.buttons |= ((buttons_pressed >> 3) << JSOFFSET_LEFT) & JSMASK_LEFT;
+			local_simple_state.buttons |= ((buttons_pressed >> 2) << JSOFFSET_RIGHT) & JSMASK_RIGHT;
+			local_simple_state.buttons |= ((buttons_pressed >> 11) << JSOFFSET_LCLICK) & JSMASK_LCLICK;
+			local_simple_state.buttons |= ((buttons_pressed >> 8) << JSOFFSET_MINUS) & JSMASK_MINUS;
+			local_simple_state.buttons |= ((buttons_pressed >> 6) << JSOFFSET_L) & JSMASK_L;
+			local_simple_state.buttons |= ((buttons_pressed >> 13) << JSOFFSET_CAPTURE) & JSMASK_CAPTURE;
+			local_simple_state.lTrigger = (float)((buttons_pressed >> 7) & 1);
+			local_simple_state.buttons |= ((int)(local_simple_state.lTrigger) << JSOFFSET_ZL) & JSMASK_ZL;
+			local_simple_state.buttons |= ((buttons_pressed >> 5) << JSOFFSET_SL) & JSMASK_SL;
+			local_simple_state.buttons |= ((buttons_pressed >> 4) << JSOFFSET_SR) & JSMASK_SR;
+		}
+
+		// right:
+		if (jc->left_right == 2) {
+			local_simple_state.buttons |= ((buttons_pressed >> 16) << JSOFFSET_W) & JSMASK_W;
+			local_simple_state.buttons |= ((buttons_pressed >> 17) << JSOFFSET_N) & JSMASK_N;
+			local_simple_state.buttons |= ((buttons_pressed >> 18) << JSOFFSET_S) & JSMASK_S;
+			local_simple_state.buttons |= ((buttons_pressed >> 19) << JSOFFSET_E) & JSMASK_E;
+			local_simple_state.buttons |= ((buttons_pressed >> 26) << JSOFFSET_RCLICK) & JSMASK_RCLICK;
+			local_simple_state.buttons |= ((buttons_pressed >> 25) << JSOFFSET_PLUS) & JSMASK_PLUS;
+			local_simple_state.buttons |= ((buttons_pressed >> 22) << JSOFFSET_R) & JSMASK_R;
+			local_simple_state.buttons |= ((buttons_pressed >> 28) << JSOFFSET_HOME) & JSMASK_HOME;
+			local_simple_state.rTrigger = (float)((buttons_pressed >> 23) & 1);
+			local_simple_state.buttons |= ((int)(local_simple_state.rTrigger) << JSOFFSET_ZR) & JSMASK_ZR;
+			local_simple_state.buttons |= ((buttons_pressed >> 21) << JSOFFSET_SL) & JSMASK_SL;
+			local_simple_state.buttons |= ((buttons_pressed >> 20) << JSOFFSET_SR) & JSMASK_SR;
+		}
+
+		// pro controller:
+		if (jc->left_right == 3) {
+			local_simple_state.buttons |= ((buttons_pressed >> 1) << JSOFFSET_UP) & JSMASK_UP;
+			local_simple_state.buttons |= ((buttons_pressed) << JSOFFSET_DOWN) & JSMASK_DOWN;
+			local_simple_state.buttons |= ((buttons_pressed >> 3) << JSOFFSET_LEFT) & JSMASK_LEFT;
+			local_simple_state.buttons |= ((buttons_pressed >> 2) << JSOFFSET_RIGHT) & JSMASK_RIGHT;
+			local_simple_state.buttons |= ((buttons_pressed >> 16) << JSOFFSET_W) & JSMASK_W;
+			local_simple_state.buttons |= ((buttons_pressed >> 17) << JSOFFSET_N) & JSMASK_N;
+			local_simple_state.buttons |= ((buttons_pressed >> 18) << JSOFFSET_S) & JSMASK_S;
+			local_simple_state.buttons |= ((buttons_pressed >> 19) << JSOFFSET_E) & JSMASK_E;
+			local_simple_state.buttons |= ((buttons_pressed >> 11) << JSOFFSET_LCLICK) & JSMASK_LCLICK;
+			local_simple_state.buttons |= ((buttons_pressed >> 26) << JSOFFSET_RCLICK) & JSMASK_RCLICK;
+			local_simple_state.buttons |= ((buttons_pressed >> 25) << JSOFFSET_PLUS) & JSMASK_PLUS;
+			local_simple_state.buttons |= ((buttons_pressed >> 8) << JSOFFSET_MINUS) & JSMASK_MINUS;
+			local_simple_state.buttons |= ((buttons_pressed >> 22) << JSOFFSET_R) & JSMASK_R;
+			local_simple_state.buttons |= ((buttons_pressed >> 6) << JSOFFSET_L) & JSMASK_L;
+			local_simple_state.buttons |= ((buttons_pressed >> 28) << JSOFFSET_HOME) & JSMASK_HOME;
+			local_simple_state.buttons |= ((buttons_pressed >> 13) << JSOFFSET_CAPTURE) & JSMASK_CAPTURE;
+			local_simple_state.rTrigger = (float)((buttons_pressed >> 23) & 1);
+			local_simple_state.lTrigger = (float)((buttons_pressed >> 7) & 1);
+			local_simple_state.buttons |= ((int)(local_simple_state.lTrigger) << JSOFFSET_ZL) & JSMASK_ZL;
+			local_simple_state.buttons |= ((int)(local_simple_state.rTrigger) << JSOFFSET_ZR) & JSMASK_ZR;
+		}
+	}
+
+	jc->modifying_lock.lock();
 	jc->last_simple_state = jc->simple_state;
 	jc->simple_state = local_simple_state;
 

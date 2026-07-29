@@ -1050,7 +1050,17 @@ JSL_AUTO_CALIBRATION JslGetAutoCalibrationStatus(int deviceId) {
 
 	return {};
 }
-
+void JslGetAccelerometerTelemetry(int deviceId, float& shakiness, float& minDeltaAccel) {	//@208
+	std::shared_lock<std::shared_timed_mutex> lock(_connectedLock);
+	JoyShock* jc = GetJoyShockFromHandle(deviceId);
+	if (jc != nullptr) {
+		shakiness = jc->motion.GetShakiness();
+		minDeltaAccel = jc->motion.GetMinDeltaAccel();
+		return;
+	}
+	shakiness = 0.0f;
+	minDeltaAccel = 0.0f;
+}
 // this function will get called for each input event from each controller
 void JslSetCallback(void(*callback)(int, JOY_SHOCK_STATE, JOY_SHOCK_STATE, IMU_STATE, IMU_STATE, float)) {
 	// exclusive lock
@@ -1097,7 +1107,8 @@ JSL_SETTINGS JslGetControllerInfoAndSettings(int deviceId)
 		settings.isCalibrating = jc->use_continuous_calibration;
 		settings.autoCalibrationEnabled = jc->motion.GetCalibrationMode() != GamepadMotionHelpers::CalibrationMode::Manual;
 		settings.isWired = jc->is_usb;
-		settings.controllerPath = jc->path;
+		//settings.controllerPath = jc->path;
+		snprintf(settings.controllerPath, sizeof(settings.controllerPath), "%s", jc->path.c_str());		//@209
 
 		switch (jc->controller_type)
 		{
