@@ -8,7 +8,7 @@
 ← Choose your language
 
 ## What is it
-**Joy-Con Advance** is an XBOX/DS4 gamepad emulator featuring advanced options for Joy-Cons, Pro Controllers, DualShock 4, and DualSense Edge. It's based on the DSAdvance project by r57zone.
+**Joy-Con Advance** is an XBOX/DS4 gamepad emulator featuring advanced options for Joy-Con, Pro Controller, DualShock 4, and DualSense. It's based on the DSAdvance project by r57zone.
 
 ## Basic features of the original:
 - Assign gamepad buttons to emulate XBOX buttons or keyboard/mouse keys (a separate profile for each) <br>
@@ -21,19 +21,19 @@
 - Support for two gamepads (second gamepad is limited to basic functions)<br>
 - Magic Wheel feature: use the gyro movements in different directions as additional buttons/actions<br>
 - External pedal: connect pedals to emulate triggers or sticks (limited device support) <br>
-- Minimal memory and CPU usage (0.20% - 0.50%)<br>
+- Minimal CPU/RAM usage
  
 ## Key Differences in JCAdvance:
 - **Gyro Concept:** Separate gyro motion approaches and fine-tuning for Joy-Cons and two-handed gamepads
-- **Gyro Calibration:** Advanced calibration for Joy-con to compensate for thermal IMU drift (see [Technical Details](#tech-info))
 - **Digital Trigger Bypass for Joy-Cons:** utilize all 6 virtual Xbox analog axes (4 mapped to sticks + 2 to gyro)
+- **Gyro Calibration:** Advanced calibration for Joy-con to compensate for thermal IMU drift (see [Technical Details](#tech-info))
 - **GUI:** New config tool and redesigned user-friendly main interface
 - **Bug Fixes**, **improvements** and some **new features**
 
 <details>
   <summary><h4>Learn more about Gyro Сoncept and Digital Trigger Bypass</h4></summary>
 
-While *DSAdvance* was primarily designed for two-handed Sony controllers with Joy-Con support, **JCAdvance** focuses on making Joy-Cons easy and intuitive to use. It introduces flexible gyroscope adjustments via the **Gyro Space**, **Tightening** setting (by JibbSmart) for different controllers and ability to use all analog axes of the XBOX virtual controller for Joy-Cons.
+While *DSAdvance* was primarily designed for two-handed Sony controllers with Joy-Con support, **JCAdvance** focuses on making Joy-Cons easy and intuitive to use. It introduces flexible gyroscope adjustments via the **Gyro Space**, **Tightening** setting (by Jibb Smart) for different controllers and ability to use all analog axes of the XBOX virtual controller for Joy-Cons.
 
 The core philosophy of Gyro Motion differs between controller types:
 * **Two-handed controllers:** Gyro is best used for fine-tuning and adjusting classic stick aiming.
@@ -76,16 +76,17 @@ In "Stick as trigger" mode, you can only assign two buttons to the free X-axis (
 - **Gyro Melee Gesture:** Perform physical punching, hooking, or hammering gestures to trigger virtual buttons
 - **Gyro Space Option:** A crucial setting for Gyro Mouse/Stick modes (see [Technical Details](#tech-info) for more information)
 - **Gyro Tightening Adjustment:** filter to eliminate hand tremors and hardware sensor noise by JibbSmart
-- **Smart Sensitivity Adjustment:** Change the sensitivity by hotkeys in game and view the latest values in the console
+- **Advanced Sensitivity Adjustment:** Change the sensitivity by hotkeys in game and view the values in the console
 - **Сalibration indicator:** successful first auto-calibration by the beep
 - **Manual recalibrating:** Place device on a flat surface, press customizable hotkey and wait for the beep
 - **Left handed mode:** Option to read Gyro data from the left Joy-Con in combined mode
 - **Polling Rate Option:** Increase the polling rate for smoother motion response
 - **Right Stick as triggers mode:** utilize all 6 virtual controller analog axes (mainly for Joy-Con) 
 - **Right Stick as buttons mode:** using the stick directions as virtual buttons
+- **Anti-Deadzone:** Advanced Radial Anti-Deadzone for hardware and Gyro stick
 - **Non-Linear Response:** Non-linear stick and steering wheel sensitivity options
 - **EMA Smoothing Filter:** Exponential Moving Average (see [Technical Details](#tech-info) for more information)
-- **OSD info**: current values from sticks, triggers and gyroscope; current battery status and device polling rate
+- **OSD info**: current values from sticks, triggers and IMU; current battery status and device polling rate
 - **DirectInput Emulation:** Option to emulate a DirectInput controller instead of a virtual XBOX 360 controller
 - **Improved Driving Mode:** Eliminated sudden steering wheel jerks to the opposite side at maximum angles
 - Added a hotkey for manual steering wheel recalibration/centering
@@ -225,19 +226,22 @@ __________
 
   ### OSD
 
-The OSD now displays real-time sticks, triggers and gyroscope telemetry.<br>
+The OSD now displays real-time sticks, triggers and gyroscope/accelerometer telemetry.<br>
 **For Triggers**: raw data from 0 to 255. <br>
 **For Sticks**: raw data fromm -32768 to 32768 <br>
 Gyro telemetry: This helps you understand how the JoyShockLibrary auto-calibration handles thermal gyro drift (see more in "Calibration") <br>
 **Calib (0-100%)**: Algorithm confidence. Usually stays at 100%, meaning the baseline noise is known. It drops to 0% only during a manual reset (ALT+C)<br>
 **Steady (YES / NO)**: Physical stillness detector. When it says YES, the controller is perfectly still, and the background auto-calibration is actively collecting data.<br>
 **BiasX / BiasY**: The actual hardware drift offsets (in degrees/second). Sensors naturally drift. These numbers show the raw error the emulator is suppressing during calibration to keep crosshair perfectly still.<br>
+**MinAc (MinDeltaAccel):** Shows the lowest recorded accelerometer noise threshold used as a baseline for software auto-calibration. For example, the Mobapad M6S outputs a value around 0.003 - 0.004. This is a sufficiently low value, indicating that the sensor is healthy and ready for perfect calibration. <br>
+**Shake (Shakiness):** Displays the real-time level of vibration or hand tremor. Approximate "healthy" metrics: ~0.003 (resting on a desk), ~0.005 - 0.01 (in hands resting on a desk), and 0.01 - 0.015 (free-hand aiming).  <br>
+If the readings significantly exceed these values and the device is not functioning properly, you need to perform a hardware calibration
 
 Pro Tip: If you hold the gamepad for a few minutes and then put it on a table, you might see the Bias values jump or slightly fluctuate (e.g., from 1.09 to 1.02). This is normal! It proves the software calibration is actively recalculating the thermal drift.
 
-Also added current battery status and device poling rate info
+Also added current battery status and device poling rate info (see 'Polling Rate & Performance' below) 
 
-  ### New Smart Gyro Sensitivity Adjustment
+  ### Advanced Gyro Sensitivity Adjustment
 
 How it works: Launch the game, use the in-game settings to configure the controls, then, if necessary, use hotkeys to fine-tune the gyro (aiming) sensitivity (+- 5 units). After exiting the game, you’ll see a full log of the sensitivity changes in the console window; take the latest value and save it to Config.exe 
 
@@ -254,15 +258,14 @@ The Accelerometer measures Earth's gravity. To calibrate it, the controller must
 Hardware Calibration Methods: <br>
 - Sony (DualShock 4 / DualSense): Calibrated automatically at the factory. They usually do not require manual calibration <br>
 - Original Nintendo (Joy-Con / Pro Controller): Calibrate them by connecting to a Nintendo Switch console (System Settings -> Controllers and Sensors -> Calibrate Motion Controls). If you don't own a Switch, use the free PC tool Joy-Con Toolkit. JCAdvance automatically reads these precise offsets from the controller's internal memory <br>
-- Third-Party Clones (Mobapad, IINE, NYXI, etc.): These controllers usually have a built-in hardware shortcut to recalibrate sensors (e.g., holding R + X + HOME for right [Mobapad M6](https://www.youtube.com/watch?v=DRcDEmGya6M&t=2s)). Check your controller's manual
+- Third-Party Clones (Mobapad, IINE, NYXI, etc.): These controllers usually have a built-in hardware shortcut to recalibrate sensors (e.g., holding R + X + HOME for right [Mobapad M6](https://www.youtube.com/watch?v=DRcDEmGya6M&t=2s)). <br>
+However, first try simply reflashing the device and reconnecting it (removing it from the Windows Bluetooth devices list); this is usually enough to get it working properly
 
 ⚠️ For succsesfull calibrating **Accelerometer sensor** on separated Joy-Cons, attach them to the Switch console or use the charging Grip. If you lay a bare Joy-Con on a table, it will tilt due to the protruding SL/SR buttons, resulting in a crooked calibration. <br>
-You can use a smartphone simple bubble-level app (or pro free app like Phyphox) to verify your desk or floor is actually flat <br>
-
-Practical tip for Mobapad M6: Launch Phyphox, select Acceleration with g > Simple > place your smartphone on top, and put something under the gamepad to achieve values close to "0" for the Accelerometer X and Y parameters, then complete the calibration. For perfectionists only :)
+You can use a smartphone simple bubble-level app (or pro free app like Phyphox) to make sure the surface is truly level, but don't forget about the issue with the protruding camera module. For example, in Phyphox, you can enable remote access, place your smartphone on the screen, and view the data from your smartphone in a browser via Wi-Fi
 
   ### Software Calibration (correction) & Drift Prevention
-  Due to imperfections in MEMS sensors (such as temperature drift—the sensor heating up), particularly in the Joy-Con controllers, a cumulative **gyroscope** drift effect may occur over time — a slight deviation from zero that manifests as random movement of the in-game camera. After the temperature rises during the first few minutes of a gaming session (due to the battery, the palm of the hand, or the crystal’s own heat generation) and then stabilizes, the drift generally stops increasing, but it needs to be compensated for. To do this JCAdvacne features a smart calibration system (by JibbSmart) to keep your gyro aiming perfectly accurate and eliminate "cursor/stick drift"<br> 
+  Due to imperfections in MEMS sensors (such as temperature drift—the sensor heating up), particularly in the Joy-Con controllers, a cumulative **gyroscope** drift effect may occur over time — a slight deviation from zero that manifests as random movement of the in-game camera. After the temperature rises during the first few minutes of a gaming session (due to the battery, the palm of the hand, or the crystal’s own heat generation) and then stabilizes, the drift generally stops increasing, but it needs to be compensated for. To do this JCAdvacne features a smart calibration system (by Jibb Smart) to keep your gyro aiming perfectly accurate and eliminate cursor/stick drift <br> 
 
 ⚠️ Software corrections affects only the gyroscope sensor and works when the emulator is running
 
@@ -276,7 +279,7 @@ Press Alt + C (or your mapped Key). You will hear a low beep. Place the controll
 Note: If you move the controller too much during this process, you will hear a low error beep after 5 seconds, meaning calibration failed
 
 #### Manual Accelerometer Calibration
-This is only necessary in rare cases when you want to use World Gyro Space mode (more on this below) but are unable to perform a hardware calibration of the accelerometer
+This is only necessary in rare cases (e.g., the device was dropped, a failed firmware update, etc.) and when you want to use 1, 2 or 3 Gyro space mode (more on this below) but are unable to perform a hardware calibration of the device
 
 #### Config.ini Settings
 AutoCalibrationEnabled=1 — (Default) Continuous background calibration is ON <br>
@@ -324,36 +327,38 @@ Accelerometer fine-tuning settings from Joyshocklibrary (Nintendo only) :<br>
 
   ### Gyro Motion Space
 
-This option controls how the gyroscope interprets hand movements into mouse/stick movements depending on the tilt of your wrist (clockwise or counter-clockwise) and how you hold the gamepad (face buttons pointing toward you or horizontally). In DSAdvance, "0" is a hard-coded value. Now we have all 3 modes from the JoyShockLibrary creator: <br>
+This option controls how the gyroscope interprets hand movements into mouse/stick movements depending on the tilt of your wrist and how you hold the gamepad (horizontally – with ZL(L2) and ZR(R2) facing the screen; vertically – facing the ceiling). In DSAdvance, "0" is a hard-coded value. Now we have all 3 modes from the JoyShockLibrary creator: <br>
 
 * **0 (Local Space):** Relies entirely on the gyroscope. Movement is calculated relative to the controller's plastic body, ignoring gravity <br>
 * **1 (World Space):** Relies on the gyroscope and accelerometer. It uses real-world gravity to separate horizontal and vertical aiming <br>
 * **2 (Player Space):** Relies on the gyroscope and accelerometer. For two-handed controllers
 
 (!) New setting: <br>
-* **3 (Planar Space):** Relies on the gyroscope and accelerometer. It mathematically projects movement onto a 2D plane, completely ignoring wrist-roll ("screwdriver" effect) at any grip angle. A limit has been added for extreme angles; otherwise, the direction of motion reverses. Also a limit has been added for extreme angles; otherwise, the direction of motion reverses. <br>
+* **3 (Planar Space):** Relies on the gyroscope and accelerometer. It mathematically projects movement onto a 2D plane, completely ignoring wrist-roll ("screwdriver" effect) at any grip angle, but have a limits for extreme angles; otherwise, the direction of motion reverses. <br>
 Designed specifically for the Joy-Con
 
-⚠️ For modes 1 2 3: If your in-game crosshair moves diagonally when you swipe your hands horizontally (cross-talk), your accelerometer is miscalibrated. Calibrate the accelerometer correctly (see harware calibration). If you cannot perform a hardware calibration of the accelerometer, use software calibration (hotkey) or Local Space mode only. <br>
+⚠️ For modes 1 2 3: If your in-game crosshair moves diagonally when you swipe your hands horizontally (cross-talk), your accelerometer is miscalibrated. Calibrate the accelerometer correctly (see hardware calibration). If you cannot perform a hardware calibration of the accelerometer, use software calibration (hotkey) or Local Space mode only. <br>
 
 In short: for two-handed gamepads, the recommended values are 0 or 2. For Joy-Con: 1 or 3.
 
-**For two-handed gamepads:** let’s take the example of the standard grip, where the L1 and R1 buttons are positioned at an angle of roughly 45 degrees from us. To move the mouse cursor up and down, rotate the gamepad around its axis, with L1 and R1 moving from the ceiling toward the screen and back. This applies to all modes (0, 2). The difference begins with left-right movements. To move the cursor to the left: <br>
-0 — "steering wheel" movement to the left <br>
-2 — tilt the right side of the gamepad (R1) away from you while bringing the left side (L1) closer. If you hold the gamepad horizontally (which is uncomfortable), the "steering wheel" movement returns. <br>
+**For two-handed gamepads:** let’s take the example of the standard grip, where the L1 and R1 buttons are positioned at an angle of roughly 45 degrees from us. To move the mouse cursor up and down, rotate the gamepad around its axis, with L1 and R1 moving from the ceiling toward the screen and back. This applies to all modes (0, 2). The difference begins with left-right movements. To move the cursor to the left-right: <br>
+0 — Turn the controller like a car steering wheel (Roll,  Gyroscope only mode) <br>
+2 — Twist the controller like tank steering levers (Yaw, Gyroscope + Accelerometer mode) <br>
+If you hold the gamepad horizontally (which is uncomfortable), the "steering wheel" movement returns. <br>
 
 **For Joy-Cons** the situation is different. Since you hold a single Joy-Con in a free hand, you control the cursor either by twisting your wrist (faster but less precise) or by moving your entire forearm (slower but more precise). Two main factors negatively impact how accurately the cursor tracks your hand's actual movement vector: <br>
-a) wrist rotation (clockwise/counter-clockwise, Z-axis Roll, where the SL and SR buttons point to the floor or ceiling) <br>
-b) controller orientation - horizontal, with R and ZR pointing at the screen, or vertical, with them pointing to the ceiling. <br>
+a) Roll - clockwise/counter-clockwise wrist rotation (like a screwdriver)   <br>
+b) Pitch - controller orientation, where horizontal - with R and ZR pointing at the screen, vertical-  with them pointing to the ceiling <br>
 
-Differences between modes: <br>
-0 — Wrist rotation always affects aiming regardless of the controller's orientation. This means that to move the cursor perfectly horizontally to the left, you must move your wrist or entire arm to the left without twisting your hand at all. <br>
-1 — Wrist rotation does not matter (within 180 degrees, i.e. the range of rotation of the SL and SR buttons from floor to ceiling), but your grip does. <br>
-With a relatively horizontal grip (R and ZR pointing at the screen), the cursor will strictly follow your hand's movement vector, but the greater the vertical angle of the gamepad (with the R and ZR buttons pointing closer to the ceiling), the more the ‘screwdriver’ gesture will affect the movement of the cursor/joystick along the X-axis.  <br>
-3 — Wrist rotation does not matter (within 180 degrees) and no more the screwdriver effect in any grip! <br>
-Designed specifically for the Joy-Con
+Imagine the Joy-Con as an airplane: ZR is the nose, ABXY is the roof. Controls: Pitch = nose up/down, Yaw = nose left/right.
+Roll — twisting around the nose axis ("screwdriver" gesture). Behavior in different modes: <br>
+0 — At Roll > 0, Pitch and Yaw axes skew. Requires keeping the Joy-Con level at all times (gyroscope only mode) <br>
+1 — At Roll < 120°, no axis skew occurs. At Pitch > 0, wrist twisting (screwdriver) starts influencing Yaw (+accelerometer) <br>
+3 — No axis skewing. No screwdriver effect, but aim locks when Pitch > 90° (+accelerometer)
 
-Conclusion: Mode "3" provide the best accuracy and predictability for Joy-Con gyro motion aiming, provided the accelerometer is calibrated correctly
+Conclusion: With a more or less horizontal grip, Mode "3" provides the best accuracy and predictability for gyro aiming.   <br>
+You can see this for yourself by testing how the mouse cursor behaves in different modes; for example, try drawing an infinity symbol while tilting the gamepad at different angles.  <br>
+If, for some reason, you’re using a vertical grip, Mode "1" is the best choice
 
   ### Tightening (Dynamic Smoothing)
 
@@ -370,37 +375,60 @@ When you move the controller quickly (fast flicks), the filter automatically dis
 
 ### Polling Rate & Performance
 
-Due to certain limitations within some functions in the code and bugs in JoyShockLibrary, the developer of DSAdvance was forced to use SleepTimeout=15, which corresponds to 66.6 Hz — a clearly insufficient rate for smooth movement, especially for Gyro Mouse. <br>
-What limitations? The Wheel function did not work properly when SleepTimeout < 15 and has been rewritten, adding WheelXboxHoldTimer. <br>
-*Note:* For details on the updated library, visit the [JoyShockLibrary Fork](https://github.com/fttlov/JoyShockLibrary)
-    
- Default program polling rate is now 250 Hz (sleepTimeout=4 in config.ini; 1 sec = 1000ms / 4). CPU usage even at 250 Hz is only 0.30% to 0.60% :) The app uses a surprisingly small amount of PC resources
+Due to certain limitations within some functions in the code and bugs in JoyShockLibrary, the developer of DSAdvance was forced to use SleepTimeout=15, which corresponds to 66.67 Hz — a clearly insufficient rate for smooth movement, especially for Gyro Mouse. <br>
+
+ After fixing limitations and bugs default program polling rate is now 250 Hz (sleepTimeout=4 in config.ini; 1 sec = 1000ms / 4). CPU usage even at 250 Hz is only 0.30% to 0.60% :) The app uses a surprisingly small amount of PC resources
   
 <details>
 <summary><b>Why exactly 250 Hz</b></summary>
 
-For example, the Mobapad M6S (a Joy-Con equivalent) is polled by the system via Bluetooth at a frequency of **125 Hz** (with a communication interval of 8 ms, as specified by Windows). You can check your device's polling frequency in the OSD.
+### 1. How Bluetooth Data Exchange Works (Where These Numbers Come From)
 
-#### Asynchronous Bluetooth Polling
+Bluetooth is not a continuous analog wire. Over-the-air data transmission is strictly bound to fixed time intervals:
 
-Left and Right Joy-Cons are completely independent Bluetooth devices. They transmit their data packets asynchronously (staggered in time) rather than at the exact same millisecond. 
-* The Left Joy-Con might transmit its reports at `0 ms`, `8 ms`, `16 ms`, and `24 ms`
-* The Right Joy-Con might transmit its reports at `4 ms`, `12 ms`, `20 ms`, and `28 ms`
+1. **Time Slots:** Bluetooth airtime is sliced into microscopic windows of exactly **625 µs (0.625 ms)** each. That equates to 1,600 slots per second.
+2. **Packet-Based Exchange:** A controller does not transmit data continuously. Instead, it wakes up on a schedule (via Sniff Mode), sends a single data packet (a report containing buttons, sticks, and gyro data), and goes back to sleep to conserve battery.
+3. **Quantized Intervals:** A minimal communication round-trip (host poll + controller response) requires a slot pair — **1.25 ms**. Because of this, any standard polling interval is physically a multiple of 1.25 ms:
+   * **10 slots (6.25 ms)** $\rightarrow$ $1000 / 6.25 =$ **160 Hz**
+   * **12 slots (7.50 ms)** $\rightarrow$ $1000 / 7.50 =$ **133.3 Hz**
+   * **24 slots (15.0 ms)** $\rightarrow$ $1000 / 15.0 =$ **66.7 Hz**
 
-While your Bluetooth adapter doesn't "overclock" its hardware, its radio module naturally manages independent time-slots for both devices simultaneously. From the Windows operating system's perspective, new controller data arrives in the queue **every 4 milliseconds** (resulting in a combined throughput of **250 Hz**)
+### 2. Expected OSD Metrics for Supported Controllers
 
-#### Eliminating Input Lag
+| Device | Connection | Expected OSD Rate | Details |
+| :--- | :--- | :--- | :--- |
+| **Sony DualShock 4** | Bluetooth | **~250 Hz** | Sony's protocol polls the controller every 4 ms |
+| **Sony DualSense** | Bluetooth | **??? Hz** | Currently in testing |
+| **Mobapad M6s / M6 HD**  | Bluetooth | **133 – 160 Hz** | Depends on your PC's Bluetooth adapter chip |
+| **Original Joy-Con (L / R)** | Bluetooth | **~66.7 Hz** | Sends a packet every 15 ms (containing 3 IMU samples) |
+| **Nintendo Switch Pro Controller** | Bluetooth | **~66.7 Hz** | Standard Nintendo polling interval for the Switch |
 
-If you keep your emulator's loop at **125 Hz** (`SleepTimeOut = 8`), the program only checks the Windows input queue every 8 ms. This means the Right Joy-Con's aiming data (arriving at `4 ms`) is forced to wait in the OS buffer for 4 ms before being processed at `8 ms`.
+Note: Actual figures are available only for the Mobapad M6S with the Asus Bt-400 (160 Hz) and Intel 9260 (133 Hz). For all other devices, refresh rate data was obtained from the Internet. <br>
+It’s also important to note that things aren’t all that bad for Nintendo. The IMU chip itself operates at a frequency of 200hz, and the Bluetooth packet contains data from three simultaneous gyroscope and accelerometer measurements, which are processed by Joyshocklibrary
 
-By setting the emulator's polling rate to **250 Hz** (`SleepTimeOut = 4`):
-1. The engine queries the input queue every 4 ms
-2. It intercepts and processes the Left Joy-Con's packet at `0 ms` and the Right Joy-Con's aiming packet almost instantly at `4 ms`
-3. This effectively **halves the average input lag** of your aiming hand, delivering the most responsive gyro controls possible
+### 3. Impact of the Bluetooth Adapter and Radio Conditions
+
+Controllers like the **Mobapad M6s** clearly highlight the differences between various host controller chips on a PC:
+
+* **Broadcom Adapters (e.g., Asus USB-BT400):** Negotiate a minimum interval of 10 slots, delivering a stable **150–160 Hz**. Broadcom's link manager scheduler is optimized for low-latency gaming HID devices.
+* **Built-in Intel Modules (Wi-Fi/BT combo: 9260, AX200, AX210, etc.):** Hardware antennas are shared between Wi-Fi and Bluetooth. Intel's firmware conservatively caps the interval at 12 slots to protect coexisting traffic, locking the polling rate at exactly **133 Hz**.
+* **Frequency Drops (e.g., dropping from 160 down to 110–130 Hz):** Indicate physical **Packet Loss**. The human body heavily absorbs 2.4 GHz radio waves. Obstructing the line-of-sight between the adapter and the controller with a hand or knee causes dropped slots due to transmission errors.
+
+The built-in OSD displays the **actual incoming packet rate (Hz)** for each connected device. <br>
+The number shown in the OSD is literally a counter of how many of these over-the-air packets the Windows OS managed to receive and process over the last second.
+
+### 4. Emulator Internal Loop (`SleepTimeOut`) and Input Queuing
+
+The emulator settings allow configuring the tick rate of the main processing loop (`SleepTimeOut`): **250 Hz** (4 ms), **125 Hz** (8 ms), **66.7 Hz** (15 ms), or **33.3 Hz** (30 ms).
+
+For smooth gyro aiming, follow this core rule: **The emulator's processing frequency must be greater than or equal to the physical packet arrival rate.**
+
+* **What happens if the emulator loop is slower than the device (e.g., a 125 Hz loop with a 160 Hz Mobapad):**
+  The controller sends a packet every 6.25 ms, but the emulator only retrieves data from the OS buffer every 8 ms. Packets arrive unevenly: during one tick the emulator gets nothing, and during the next it gets two packets at once. This introduces micro-stuttering in crosshair motion and erratic input latency.
+* **Running at 250 Hz (4 ms tick rate):**
+  The emulator is guaranteed to pick up each fresh packet from any controller (whether a 250 Hz DualSense or a 160 Hz Mobapad) the moment it enters the OS buffer, ensuring minimal input latency.
 
 </details>
-
-Note: For single controllers (Switch Pro Controller or DualSense), it's simple: just set the polling rate shown in the OSD
 
 ### 🎮 Right Stick as Analog Triggers
 
@@ -420,7 +448,7 @@ This feature can be compared to the concept of a flick stick by Jibb Smart, but 
 2. **GTA V (On-Foot & Driving):**<br>
    You can hold physical ZL to instantly lock-on/aim with your left hand, and use the right stick UP to smoothly manage progressive trigger actions. When entering a vehicle, the right stick Y-axis automatically acts as a high-precision analog gas (Y+) and brake (Y-) pedal, allowing you to manage vehicle traction without wheel spin.
    
-In other words, full analogue control is now available to most users, and features such as driving mode and external pedals further expand the vehicle’s control options, but more on that below
+In other words, full analog control is now available for Joy-con users on PC, and features such as driving mode and external pedals further expand the vehicle’s control options, but more on that below
    
 4. **Other Action Games:**
    Works for games with zoom thresholds (like *Metal Gear Solid V*) or focus-aiming mechanics (like *Hitman*), where a half-press on the trigger alters the aim perspective or stabilizes the sniper scope
@@ -484,6 +512,16 @@ Smoothing Time (time to reach 100% speed, where 100% like without filter) :
 - Value 50 (~8.0ms to reach full speed)
 - Value 75 (~24.0ms to reach full speed)
 
+
+#### Advanced Radial Anti-Deadzone & Gyro Integration 
+Many modern games have forced, unchangeable deadzones that ignore small stick movements. To fix this, JCAdvance features a sophisticated Radial (Elliptical) Anti-Deadzone. <br>
+Unlike basic "axial" (square) anti-deadzones that ruin diagonal aiming, our radial math perfectly preserves the exact angle of your input while pushing the values just past the game's deadzone threshold <br>
+-AntiDeadZoneLeftX/Y & AntiDeadZoneRightX/Y <br>
+Pushes the physical stick inputs past the game's deadzone. For example, setting 20 seamlessly bypasses a 20% in-game deadzone, making the sticks instantly responsive.
+-GyroApplyAntiDeadZone & GyroApplyLinearity <br>
+When true, the emulator applying radial Anti-Deadzone for hardware and Gyro Stick   <br>
+When false, applying only for hardware sticks, gyro retains a pure, raw 1:1 translation. The same applies to Linearity
+
 #### DualShock Emulation
   Added a feature for Nintendo controllers. When enabled, JCAdvance emulates a DirectInput Wireless Controller instead of an Xbox 360 controller. This is highly useful for legacy DirectInput games (e.g., F.E.A.R., Half-Life, classic *Need for Speed* titles)
 
@@ -498,7 +536,9 @@ Smoothing Time (time to reach 100% speed, where 100% like without filter) :
 I tested this feature using an old "Logitech Wingman" wheel and it f@cking works! 
 
 ### Fixes & Adjustments
-  - **Gyro Stick Fix:** Resolved an issue where moving the gyro on the Y-axis caused the stick to erratically snap to the center (a JoyShockLibrary fork for DSAdvance bug). <br>
+*Note:* For details on the updated library, visit the [JoyShockLibrary Fork](https://github.com/fttlov/JoyShockLibrary)
+  - **JoyShockLibrary Fixes:** For details on the updated library, visit the [JoyShockLibrary Fork Page](https://github.com/fttlov/JoyShockLibrary) 
+  - **Gyro Magic Wheel:** function did not work properly when SleepTimeout < 15 (66hz) and has been rewritten, adding WheelXboxHoldTimer
   - **Joy-Con Rumble:** Patched rumble logic for Joy-Cons (added `PacketCounter2`, flood protection, etc.)
   - **Connection Stability:** Faster connection/disconnection handling, especially for the secondary Joy-Con
   - **Crash Fixes:** Fixed a crash occurring when disconnecting two Joy-Cons simultaneously
@@ -517,7 +557,11 @@ __________
 - ~~DPI / Resolution Scaling: `Config.exe` is built using AutoHotkey. High DPI settings or unusual Windows resolutions may cause UI elements to overlap or cut off. If this happens, temporarily lower your OS scaling, change resolution.~~ Fixed
 - **Antivirus Flags:** Some antivirus software may flag `Config.exe` as a false positive due to DLL calls. The source code is entirely open-source, but if you prefer, you can configure everything manually in the `.ini` files
 - Steam Input conflict. Disable it (for Switch, Playstation .etc) or use HidHide
-- **Bluetooth Jitter:** If you experience connection drops or infinite rumble loops while using two Joy-Cons simultaneously, your Bluetooth adapter may be struggling Known reliable adapters include the ASUS USB-BT400 and cheaper alternatives based on the same BCM20702 chip, as well as some Bluetooth 4.0 adapters from Ugreen. There are several threads on Reddit discussing this issue
+- **Bluetooth Jitter:** If you experience connection drops or infinite rumble loops while using two Joy-Cons simultaneously, your Bluetooth adapter may be struggling.
+Known reliable adapters:  <br>
+(USB) ASUS BT400 and cheaper alternatives based on the same BCM20702 chip, some Bluetooth 4.0 adapters from Ugreen <br>
+(M.2) Intel 9260, AX200, AX210  <br>
+There are several threads on Reddit discussing this issue
 
 ### The list of supported controllers is limited by Joyshocklibrary
 And will not be expanded until the transition to SDL, which is a long way off
