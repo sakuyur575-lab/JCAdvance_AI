@@ -616,7 +616,7 @@ GyroAccelCap = 1.3 - 1.5
   </details>
 
   <details>
-    <summary><h3>Режим кнопок (Action Layer: Regular / LongPress)</h3></summary>
+    <summary><h3>Режим кнопок (Regular / LongPress)</h3></summary>
 
 #### 1. Поведение и настройка:
 
