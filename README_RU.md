@@ -104,6 +104,8 @@ JCAdvance не просто делает фокус на удобстве вза
   </tr>
 </table>
 
+</details>
+
 ## Необходимое ПО:
 
 [ViGEm Bus Driver](https://github.com/nefarius/ViGEmBus) - Драйвер виртуального XBOX/DS4 контроллера от nefarius <br>
